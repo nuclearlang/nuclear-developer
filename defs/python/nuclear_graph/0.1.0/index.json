@@ -1,0 +1,22 @@
+{
+"format": 1,
+"libraries": ["nuclear_graph.client","nuclear_graph.toolchain"],
+"reexports": {},
+"symbols": {
+  "GraphClient": 0,
+  "PLATFORMS": 1,
+  "Toolchain": 1,
+  "annotations": 0,
+  "describe": 1,
+  "diagnostics_of": 1,
+  "layout_path": 1,
+  "snake": 1,
+  "strip_fences": 1,
+  "target": 1,
+  "token_of": 0
+},
+"classes": {
+  "GraphClient": {"supers":[],"members":["examples","items","prompt","remember","search","stats"],"params":["client","url"]},
+  "Toolchain": {"supers":[],"members":["brief","build","check","check_project","dragonfly","fmt","help","layout","path_of"],"params":[]}
+}
+}

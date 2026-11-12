@@ -1,0 +1,497 @@
+# The task bank of the local developer's evaluation: one file each, as a frontier model hands them to it.
+# `must`: the texts the answer must contain (its acceptance criteria). `split`: `train` tasks give their frontier
+# answer to the graph as an example; `test` tasks are held out and only measure.
+
+[context]
+book_models = '''
+model NewBook
+  @minLength(1)
+  title: string
+  author: string
+  year: int
+'''
+book_entity = '''
+entity Book()
+  @primary(generated = true)
+  id: int
+  title: string
+  author: string
+  year: int
+  available: boolean = true
+'''
+book_repository = '''
+repository BookRepository
+  byAuthor(author: string) Book[]
+    where({ "author": author })
+    orderBy("year")
+    getMany()
+'''
+loan_entity = '''
+entity Loan()
+  @primary(generated = true)
+  id: int
+  bookId: int
+  reader: string
+  returned: boolean = false
+'''
+create_book = '''
+usecase CreateBook(books: BookRepository)
+  exec(input: NewBook) Result<Error, Book>
+    Ok(~books.save(Book(title = input.title, author = input.author, year = input.year)))
+'''
+
+app_book = '''
+Book
+  id: int
+  title: string
+  author: string
+  available: boolean
+'''
+app_book_error = '''
+BookError
+  message: string
+'''
+app_book_repository = '''
+@repository(path = "books")
+repository BookRepository
+  @get
+  all() Result<BookError, Book[]>
+'''
+app_books_state = '''
+BooksState
+  (loaded: Book[], error: BookError, loading: boolean)
+'''
+app_books_component = '''
+appcomponent BooksComponent
+  all() = AllBooksUseCase.exec
+'''
+
+[[task]]
+id = "model-new-book"
+split = "train"
+dialect = "fastapi"
+kind = "model"
+path = "components/books/domain/models/book_models.nuc"
+task = "A model NewBook: title (string, at least 1 character), author (string) and year (int)."
+must = ["NewBook", "@minLength(1)", "title: string", "author: string", "year: int"]
+
+[[task]]
+id = "model-reader"
+split = "train"
+dialect = "fastapi"
+kind = "model"
+path = "components/readers/domain/models/reader_models.nuc"
+task = "A model NewReader: name (string, 2 to 80 characters) and email (string, a valid email)."
+must = ["NewReader", "@minLength(2)", "@maxLength(80)", "@email", "email: string"]
+
+[[task]]
+id = "model-book-changes"
+split = "test"
+dialect = "fastapi"
+kind = "model"
+path = "components/books/domain/models/book_models.nuc"
+task = "A model BookChanges where every field is optional: title (string), year (int) and available (boolean)."
+must = ["BookChanges", "title?: string", "year?: int", "available?: boolean"]
+
+[[task]]
+id = "entity-book"
+split = "train"
+dialect = "fastapi"
+kind = "entity"
+path = "components/books/data/entities/book.nuc"
+task = "An entity Book: id (int, a generated primary key), title (string, at most 200 characters), author (string), year (int) and available (boolean, default true)."
+must = ["entity Book", "@primary(generated = true)", "id: int", "@column(length = 200)", "available: boolean = true"]
+
+[[task]]
+id = "entity-loan"
+split = "train"
+dialect = "fastapi"
+kind = "entity"
+path = "components/loans/data/entities/loan.nuc"
+task = "An entity Loan stored in the table \"loans\": id (generated primary key), bookId (int), reader (string) and returned (boolean, default false)."
+must = ["@entity(\"loans\")", "entity Loan", "@primary(generated = true)", "bookId: int", "returned: boolean = false"]
+
+[[task]]
+id = "entity-reader"
+split = "test"
+dialect = "fastapi"
+kind = "entity"
+path = "components/readers/data/entities/reader.nuc"
+task = "An entity Reader: id (generated primary key), name (string) and email (string, unique, at most 120 characters)."
+must = ["@entity(\"readers\")", "Reader", "@primary(generated = true)", "unique = true", "length = 120", "email: string"]
+
+[[task]]
+id = "repo-by-author"
+split = "train"
+dialect = "fastapi"
+kind = "repository"
+path = "components/books/data/repositories/book_repository.nuc"
+context = "book_entity"
+task = "A repository BookRepository with byAuthor(author: string) that returns the books of that author ordered by year."
+must = ["repository BookRepository", "byAuthor(author: string) Book[]", "where({ \"author\": author })", "orderBy(\"year\")", "getMany()"]
+
+[[task]]
+id = "repo-available-since"
+split = "train"
+dialect = "fastapi"
+kind = "repository"
+path = "components/books/data/repositories/book_repository.nuc"
+context = "book_entity"
+task = "A repository BookRepository with availableSince(year: int, max: int = 20): the available books whose year is greater or equal to year, ordered by title, at most max of them."
+must = ["availableSince(year: int, max: int = 20) Book[]", "gte(year)", "\"available\": true", "orderBy(\"title\")", "limit(max)"]
+
+[[task]]
+id = "repo-by-title"
+split = "test"
+dialect = "fastapi"
+kind = "repository"
+path = "components/books/data/repositories/book_repository.nuc"
+context = "book_entity"
+task = "A repository BookRepository with byTitle(title: string) that returns the one book with that title, or an error when there is none."
+must = ["byTitle(title: string) Result<Error, Book>", "where({ \"title\": title })", "getOne()"]
+
+[[task]]
+id = "repo-count-open-loans"
+split = "train"
+dialect = "fastapi"
+kind = "repository"
+path = "components/loans/data/repositories/loan_repository.nuc"
+context = "loan_entity"
+task = "A repository LoanRepository with openFor(reader: string) that counts the loans of that reader that are not returned."
+must = ["repository LoanRepository", "openFor(reader: string) int", "\"returned\": false", "count()"]
+
+[[task]]
+id = "usecase-create-book"
+split = "train"
+dialect = "fastapi"
+kind = "usecase"
+path = "components/books/domain/usecases/create_book.nuc"
+context = "book_models,book_entity,book_repository"
+task = "A use case CreateBook(books: BookRepository): exec(input: NewBook) answers a Conflict error when a book with the same title exists, otherwise saves and returns the new Book."
+must = ["usecase CreateBook(books: BookRepository)", "exec(input: NewBook) Result<Error, Book>", "exists()", "Err(Conflict(", "~books.save(Book("]
+
+[[task]]
+id = "usecase-get-book"
+split = "train"
+dialect = "fastapi"
+kind = "usecase"
+path = "components/books/domain/usecases/get_book.nuc"
+context = "book_entity,book_repository"
+task = "A use case GetBook(books: BookRepository): exec(id: int) returns the book with that id (the repository's find gives NotFound by itself)."
+must = ["usecase GetBook(books: BookRepository)", "exec(id: int) Result<Error, Book>", "~books.find(id)"]
+
+[[task]]
+id = "usecase-lend-book"
+split = "test"
+dialect = "fastapi"
+kind = "usecase"
+path = "components/loans/domain/usecases/lend_book.nuc"
+context = "book_entity,book_repository,loan_entity"
+task = "A use case LendBook(books: BookRepository, loans: LoanRepository): exec(bookId: int, reader: string) finds the book, answers a Conflict error when it is not available, otherwise marks it unavailable (update available to false) and saves a Loan for the reader."
+must = ["usecase LendBook(books: BookRepository, loans: LoanRepository)", "exec(bookId: int, reader: string)", "~books.find(bookId)", "Err(Conflict(", "~loans.save("]
+
+[[task]]
+id = "usecase-books-of-author"
+split = "train"
+dialect = "fastapi"
+kind = "usecase"
+path = "components/books/domain/usecases/books_of_author.nuc"
+context = "book_entity,book_repository"
+task = "A use case BooksOfAuthor(books: BookRepository): exec(author: string) answers Invalid when author is empty, otherwise Ok of the books of that author (byAuthor)."
+must = ["usecase BooksOfAuthor(books: BookRepository)", "exec(author: string) Result<Error, Book[]>", "Err(Invalid(", "~books.byAuthor(author)"]
+
+[[task]]
+id = "appcomponent-books"
+split = "train"
+dialect = "fastapi"
+kind = "appcomponent"
+path = "components/books/books_appcomponent.nuc"
+task = "The appcomponent BooksAppComponent with the aliases book() for GetBook.exec, create() for CreateBook.exec and byAuthor() for BooksOfAuthor.exec."
+must = ["appcomponent BooksAppComponent", "book() = GetBook.exec", "create() = CreateBook.exec", "byAuthor() = BooksOfAuthor.exec"]
+
+[[task]]
+id = "appcomponent-loans"
+split = "test"
+dialect = "fastapi"
+kind = "appcomponent"
+path = "components/loans/loans_appcomponent.nuc"
+task = "The appcomponent LoansAppComponent with the aliases lend() for LendBook.exec and giveBack() for ReturnBook.exec."
+must = ["appcomponent LoansAppComponent", "lend() = LendBook.exec", "giveBack() = ReturnBook.exec"]
+
+[[task]]
+id = "controller-books"
+split = "train"
+dialect = "fastapi"
+kind = "controller"
+path = "components/books/api/books_controller.nuc"
+context = "book_models,book_entity"
+task = "A controller BooksController(books: BooksAppComponent) on the path \"books\": GET \"{id}\" one(id: int) calls books.book(id); POST create(input: NewBook) calls books.create(input)."
+must = ["@controller(\"books\")", "controller BooksController(books: BooksAppComponent)", "@get(\"{id}\")", "one(id: int) Result<Error, Book>", "@post()", "~books.create(input)"]
+
+[[task]]
+id = "controller-author"
+split = "train"
+dialect = "fastapi"
+kind = "controller"
+path = "components/books/api/authors_controller.nuc"
+context = "book_entity"
+task = "A controller AuthorsController(books: BooksAppComponent) on the path \"authors\": GET \"{name}/books\" books(name: string) returns books.byAuthor(name)."
+must = ["@controller(\"authors\")", "controller AuthorsController(books: BooksAppComponent)", "@get(\"{name}/books\")", "books(name: string) Result<Error, Book[]>", "~books.byAuthor(name)"]
+
+[[task]]
+id = "controller-loans"
+split = "test"
+dialect = "fastapi"
+kind = "controller"
+path = "components/loans/api/loans_controller.nuc"
+context = "loan_entity"
+task = "A controller LoansController(loans: LoansAppComponent) on the path \"loans\": POST \"{bookId}\" lend(bookId: int, reader: string) calls loans.lend(bookId, reader) and answers status 201."
+must = ["@controller(\"loans\")", "controller LoansController(loans: LoansAppComponent)", "@post(\"{bookId}\"", "lend(bookId: int, reader: string)", "~loans.lend(bookId, reader)"]
+
+[[task]]
+id = "tools-books"
+split = "train"
+dialect = "fastapi"
+kind = "tools"
+path = "components/assistant/ai/book_tools.nuc"
+context = "book_entity"
+task = "A tools BookTools(books: BooksAppComponent) with one tool: bookTitle(id: int) string, documented \"Gives the title of the book with that id.\"; it matches books.book(id): Ok(b) gives b.title, Err(e) gives e.message."
+must = ["tools BookTools(books: BooksAppComponent)", "// Gives the title of the book with that id.", "bookTitle(id: int) string", "match ~books.book(id)", "Ok(b) -> b.title", "Err(e) -> e.message"]
+
+[[task]]
+id = "tools-loans"
+split = "test"
+dialect = "fastapi"
+kind = "tools"
+path = "components/assistant/ai/loan_tools.nuc"
+task = "A tools LoanTools(loans: LoansAppComponent) with one tool: lend(bookId: int, reader: string) string, documented \"Lends a book to a reader.\"; it matches loans.lend(bookId, reader): Ok(l) gives \"loan ${l.id}\", Err(e) gives e.message."
+must = ["tools LoanTools(loans: LoansAppComponent)", "// Lends a book to a reader.", "lend(bookId: int, reader: string) string", "match ~loans.lend(bookId, reader)", "Err(e) -> e.message"]
+
+[[task]]
+id = "agent-librarian"
+split = "train"
+dialect = "fastapi"
+kind = "agent"
+path = "components/assistant/ai/librarian.nuc"
+task = "An agent Librarian(tools: BookTools) whose prompt is \"You help readers find books. Use the tools; never invent ids.\""
+must = ["agent Librarian(tools: BookTools)", "prompt: string = \"You help readers find books. Use the tools; never invent ids.\""]
+
+[[task]]
+id = "agent-loans"
+split = "test"
+dialect = "fastapi"
+kind = "agent"
+path = "components/assistant/ai/loan_desk.nuc"
+task = "An agent LoanDesk(tools: LoanTools) on the chat model named \"coder\" whose prompt is \"You lend books. Confirm every loan.\""
+must = ["agent LoanDesk(tools: LoanTools)", "model: string = \"coder\"", "prompt: string = \"You lend books. Confirm every loan.\""]
+
+[[task]]
+id = "graph-summary"
+split = "train"
+dialect = "fastapi"
+kind = "graph"
+path = "components/assistant/ai/summary.nuc"
+task = "A state SummaryState (question: string, answer: string) and a graph Summary(librarian: Librarian) over it with one node ask, the first and the last, that returns { \"answer\": ~librarian.ask(state.question) }."
+must = ["SummaryState", "question: string", "@state(SummaryState)", "graph Summary(librarian: Librarian)", "@start", "@next(\"end\")", "~librarian.ask(state.question)"]
+
+[[task]]
+id = "graph-two-steps"
+split = "test"
+dialect = "fastapi"
+kind = "graph"
+path = "components/assistant/ai/review.nuc"
+task = "A state ReviewState (text: string, draft: string, final: string) and a graph Review(librarian: Librarian): node draft (the first) sets draft to ~librarian.ask(state.text) and goes to polish; node polish sets final to ~librarian.ask(\"Shorten: ${state.draft}\") and ends."
+must = ["ReviewState", "@state(ReviewState)", "graph Review(librarian: Librarian)", "@start", "@next(\"polish\")", "@next(\"end\")", "~librarian.ask(state.text)"]
+
+[[task]]
+id = "tests-create-book"
+split = "train"
+dialect = "fastapi"
+kind = "tests"
+path = "test/books_test.nuc"
+context = "book_models"
+task = "Tests Books with one test \"creates a book and refuses the same title\": inject BooksAppComponent, create NewBook(title = \"Dune\", author = \"Herbert\", year = 1965), expect it is Ok, create it again and expect the error status is 409."
+must = ["tests Books", "@test(\"creates a book and refuses the same title\")", "inject<BooksAppComponent>()", "expect(", ".isOk", "status == 409"]
+
+[[task]]
+id = "tests-missing-book"
+split = "test"
+dialect = "fastapi"
+kind = "tests"
+path = "test/missing_test.nuc"
+task = "Tests Missing with one test \"a missing book is 404\": inject BooksAppComponent, ask book(999) and expect the error status is 404."
+must = ["tests Missing", "@test(\"a missing book is 404\")", "inject<BooksAppComponent>()", "book(999)", "status == 404"]
+
+[[task]]
+id = "listener-loans"
+split = "train"
+dialect = "fastapi"
+kind = "listener"
+path = "components/loans/events/loan_events.nuc"
+context = "book_models"
+task = "A listener BookEvents(books: BooksAppComponent) with a consumer of the topic \"books.created\": created(input: NewBook) calls books.create(input)."
+must = ["listener BookEvents(books: BooksAppComponent)", "@consumer(\"books.created\")", "created(input: NewBook)", "~books.create(input)"]
+
+[[task]]
+id = "flutter-model"
+split = "train"
+dialect = "flutter"
+kind = "model"
+path = "components/books/domain/models/book.nuc"
+task = "A model Book of the mobile app: id (int), title (string) and author (string)."
+must = ["Book", "id: int", "title: string", "author: string"]
+
+[[task]]
+id = "flutter-repository"
+split = "test"
+dialect = "flutter"
+kind = "repository"
+path = "components/books/data/repositories/book_repository.nuc"
+task = "A repository BookRepository of the mobile app over the API's \"books\" path, with one GET request book(id: int) on the path \":id\" that returns a Result with a Book."
+must = ["@repository(path = \"books\")", "repository BookRepository", "@get(path = \":id\")", "book(id: int) Result<"]
+
+[[task]]
+id = "service-isbn"
+split = "train"
+dialect = "fastapi"
+kind = "service"
+path = "components/books/domain/services/isbn.nuc"
+task = "A service Isbn with valid(code: string) boolean: true when code, without its \"-\" characters, has exactly 13 characters."
+must = ["service Isbn", "valid(code: string) boolean", "replaceAll(\"-\", \"\")", "length == 13"]
+
+[[task]]
+id = "function-label"
+split = "test"
+dialect = "fastapi"
+kind = "service"
+path = "components/books/domain/services/labels.nuc"
+task = "A service Labels with age(year: int, now: int) string: \"new\" when now - year is less than 2, \"recent\" when less than 10, otherwise \"classic\" (use if / else if / else as the value)."
+must = ["service Labels", "age(year: int, now: int) string", "\"new\"", "\"recent\"", "\"classic\"", "else if"]
+
+# --- mobile (flutter) and web (react): the same platform words, another language underneath ---
+
+[[task]]
+id = "flutter-usecase"
+split = "train"
+dialect = "flutter"
+kind = "usecase"
+path = "components/books/domain/usecases/all_books_usecase.nuc"
+context = "app_book,app_book_error,app_book_repository"
+task = "A use case AllBooksUseCase of the mobile app that receives books: BookRepository and whose exec() returns the Result of ~books.all()."
+must = ["usecase AllBooksUseCase", "books: BookRepository", "exec() Result<BookError, Book[]>", "~books.all()"]
+
+[[task]]
+id = "flutter-state-model"
+split = "train"
+dialect = "flutter"
+kind = "statemodel"
+path = "components/books/presentation/list/state_models/books_state.nuc"
+context = "app_book,app_book_error"
+task = "The state model BooksState of the books list screen with three states: loaded (Book[]), error (BookError) and loading (boolean)."
+must = ["BooksState", "loaded: Book[]", "error: BookError", "loading: boolean"]
+
+[[task]]
+id = "flutter-manager"
+split = "test"
+dialect = "flutter"
+kind = "statemanager"
+path = "components/books/presentation/list/managers/books_manager.nuc"
+context = "app_book,app_book_error,app_books_state,app_books_component"
+task = "A state manager BooksManager over the state model BooksState that receives books: BooksComponent and calls load() when it starts; loading() sets the state loading; load(), run after loading, sets the state loaded with the Result of ~books.all()."
+must = ["@stateModel(BooksState)", "statemanager BooksManager", "books: BooksComponent", "@state(BooksState.loading)", "@before(loading)", "@state(BooksState.loaded)", "~books.all()"]
+
+[[task]]
+id = "flutter-screen"
+split = "test"
+dialect = "flutter"
+kind = "stateless"
+path = "components/books/presentation/list/books_screen.nuc"
+context = "app_book,app_books_state"
+task = "The screen BooksScreen at route \"/books\" that provides BooksManager: a Scaffold with an AppBar titled \"Books\" and a BooksStateBuilder<BooksManager> body that shows a CircularProgressIndicator while loading, a ListView of ListTile with each book's title when loaded, and the error's message on error."
+must = ["@screen(route = \"/books\", providers = [BooksManager])", "stateless BooksScreen", "BooksStateBuilder<BooksManager>", "CircularProgressIndicator", "ListTile", "e.message"]
+
+[[task]]
+id = "flutter-repository-post"
+split = "train"
+dialect = "flutter"
+kind = "repository"
+path = "components/books/data/repositories/book_repository.nuc"
+context = "app_book,app_book_error"
+task = "A repository BookRepository of the mobile app over the API's \"books\" path with a POST request save(book: Book) that returns a Result with the saved Book, retried once."
+must = ["@repository(path = \"books\")", "repository BookRepository", "@post(retry = 1)", "save(book: Book) Result<BookError, Book>"]
+
+[[task]]
+id = "web-repository"
+split = "train"
+dialect = "react"
+kind = "repository"
+path = "components/books/data/book_repository.nuc"
+context = "app_book,app_book_error"
+task = "A repository BookRepository of the web app over the API's \"books\" path: getOne(id: int) is a GET on the path \":id\", and all() is a GET cached for 60000 ms; both return a Result with BookError."
+must = ["@repository(path = \"books\")", "repository BookRepository", "@get(path = \":id\")", "getOne(id: int) Result<BookError, Book>", "@get(cache = true, ttl = 60000)", "all() Result<BookError, Book[]>"]
+
+[[task]]
+id = "web-tile"
+split = "test"
+dialect = "react"
+kind = "stateless"
+path = "components/books/presentation/widgets/book_tile.nuc"
+context = "app_book"
+task = "A view BookTile(book: Book) of the web app: an li with class \"tile\" whose children are a span with class \"title\" showing the book's title and a small with its author."
+must = ["stateless BookTile(book: Book)", "build() Element", "li(", "className = \"tile\"", "book.title", "book.author"]
+
+[[task]]
+id = "web-service"
+split = "train"
+dialect = "react"
+kind = "service"
+path = "components/books/domain/services/book_filters.nuc"
+context = "app_book"
+task = "A domain service BookFilters of the web app with available(books: Book[]) Book[]: the books whose available is true."
+must = ["service BookFilters", "available(books: Book[]) Book[]", "filter("]
+
+[[task]]
+id = "web-manager"
+split = "test"
+dialect = "react"
+kind = "statemanager"
+path = "components/books/presentation/list/managers/books_manager.nuc"
+context = "app_book,app_book_error,app_books_state,app_books_component"
+task = "A state manager BooksManager of the web app over the state model BooksState that receives books: BooksComponent and calls load() when it starts; loading() sets the state loading; load(), run after loading, sets the state loaded with the Result of ~books.all()."
+must = ["@stateModel(BooksState)", "statemanager BooksManager", "books: BooksComponent", "@state(BooksState.loading)", "@before(loading)", "@state(BooksState.loaded)", "~books.all()"]
+
+[[task]]
+id = "web-appcomponent"
+split = "train"
+dialect = "react"
+kind = "appcomponent"
+path = "components/books/books_component.nuc"
+task = "The application component BooksComponent of the web app: all() is AllBooksUseCase.exec and one() is GetBookUseCase.exec."
+must = ["appcomponent BooksComponent", "all() = AllBooksUseCase.exec", "one() = GetBookUseCase.exec"]
+
+# --- features: several files, planned and written in order, checked together as a project ---
+# `must` texts may be in any file of the feature. The project is a fresh `dragonfly new -p <platform> -d <dialect>`.
+
+[[feature]]
+id = "feature-books-by-author"
+split = "train"
+platform = "backend"
+dialect = "fastapi"
+spec = "Books by author. An entity Book (id: a generated primary key, title: string, author: string). A repository BookRepository with byAuthor(author: string) Book[] that filters by author and orders by title. A use case BooksOfAuthor(books: BookRepository) whose exec(author: string) returns those books. An application component BooksAppComponent with booksOf() = BooksOfAuthor.exec. A controller BooksController(books: BooksAppComponent) on \"books\" with GET \"author/{author}\" that answers ~books.booksOf(author)."
+must = ["entity Book", "@primary(generated = true)", "repository BookRepository", "byAuthor(author: string) Book[]", "usecase BooksOfAuthor", "appcomponent BooksAppComponent", "booksOf() = BooksOfAuthor.exec", "controller BooksController", "@get(\"author/{author}\")"]
+
+[[feature]]
+id = "feature-new-reader"
+split = "test"
+platform = "backend"
+dialect = "fastapi"
+spec = "Register readers. An entity Reader (id: a generated primary key, name: string, email: string unique). A model NewReader (name: at least 2 characters, email: a valid email). A use case CreateReader(readers: ReaderRepository) whose exec(input: NewReader) saves a Reader with the input's name and email and returns it in a Result. A repository ReaderRepository (no methods of its own). An application component ReadersAppComponent with create() = CreateReader.exec. A controller ReadersController(readers: ReadersAppComponent) on \"readers\" with a POST that answers ~readers.create(input) with status 201."
+must = ["@entity(", "Reader", "unique = true", "NewReader", "@email", "usecase CreateReader", "repository ReaderRepository", "appcomponent ReadersAppComponent", "controller ReadersController", "201"]
+
+[[feature]]
+id = "feature-books-list-app"
+split = "test"
+platform = "mobile"
+dialect = "flutter"
+spec = "The books list of the mobile app, component books. A model Book (id: int, title: string). A model BookError (message: string). A repository BookRepository over the API's \"books\" path with a GET all() that returns Result<BookError, Book[]>. A use case AllBooksUseCase(books: BookRepository) whose exec() returns ~books.all(). An application component BooksComponent with all() = AllBooksUseCase.exec."
+must = ["Book", "BookError", "@repository(path = \"books\")", "repository BookRepository", "all() Result<BookError, Book[]>", "usecase AllBooksUseCase", "appcomponent BooksComponent", "all() = AllBooksUseCase.exec"]

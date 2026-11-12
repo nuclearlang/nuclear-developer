@@ -1,0 +1,441 @@
+{
+  "model-new-book": {
+    "code": "model NewBook\n  @minLength(1) title: string\n  author: string\n  year: int\n",
+    "cost": 0.0466,
+    "attempts": 1,
+    "seconds": 5.7,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "model-reader": {
+    "code": "NewReader\n  @minLength(2) @maxLength(80) name: string\n  @email email: string\n",
+    "cost": 0.0344,
+    "attempts": 1,
+    "seconds": 5.2,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "model-book-changes": {
+    "code": "model BookChanges\n  title?: string\n  year?: int\n  available?: boolean\n",
+    "cost": 0.0115,
+    "attempts": 1,
+    "seconds": 4.3,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "entity-book": {
+    "code": "// A book of the catalog.\n@entity(\"books\")\nentity Book\n  @primary(generated = true)\n  id: int\n\n  @column(length = 200)\n  title: string\n\n  author: string\n  year: int\n  available: boolean = true\n",
+    "cost": 0.0121,
+    "attempts": 1,
+    "seconds": 4.4,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "entity-loan": {
+    "code": "@entity(\"loans\")\nentity Loan\n  @primary(generated = true)\n  id: int\n  bookId: int\n  reader: string\n  returned: boolean = false\n",
+    "cost": 0.0118,
+    "attempts": 1,
+    "seconds": 4.0,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "entity-reader": {
+    "code": "@entity(\"readers\")\nentity Reader\n  @primary(generated = true)\n  id: int\n\n  name: string\n\n  @column(length = 120, unique = true)\n  email: string\n",
+    "cost": 0.0117,
+    "attempts": 1,
+    "seconds": 3.8,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "repo-by-author": {
+    "code": "repository BookRepository\n  byAuthor(author: string) Book[]\n    where({ \"author\": author })\n    orderBy(\"year\")\n    getMany()\n",
+    "cost": 0.012,
+    "attempts": 1,
+    "seconds": 5.4,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "repo-available-since": {
+    "code": "repository BookRepository\n  availableSince(year: int, max: int = 20) Book[]\n    where({ \"available\": true, \"year\": { \"gte\": year } })\n    orderBy(\"title\")\n    limit(max)\n    getMany()\n",
+    "cost": 0.0124,
+    "attempts": 1,
+    "seconds": 4.3,
+    "check": "ok",
+    "missing": [
+      "gte(year)"
+    ],
+    "pass": false
+  },
+  "repo-by-title": {
+    "code": "repository BookRepository\n  byTitle(title: string) Result<Error, Book>\n    where({ \"title\": title })\n    getOne()\n",
+    "cost": 0.012,
+    "attempts": 1,
+    "seconds": 5.2,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "repo-count-open-loans": {
+    "code": "repository LoanRepository\n  openFor(reader: string) int\n    where({ \"reader\": reader, \"returned\": false })\n    count()\n",
+    "cost": 0.0121,
+    "attempts": 1,
+    "seconds": 4.1,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "usecase-create-book": {
+    "code": "usecase CreateBook(books: BookRepository)\n  exec(input: NewBook) Result<Error, Book>\n    existing = ~books.findAll()\n    for b in existing\n      if b.title == input.title\n        return Err(Conflict(\"A book titled '${input.title}' already exists\"))\n    saved = ~books.save(Book(title = input.title, author = input.author, year = input.year))\n    Ok(saved)\n",
+    "cost": 0.017,
+    "attempts": 1,
+    "seconds": 7.1,
+    "check": "ok",
+    "missing": [
+      "exists()"
+    ],
+    "pass": false
+  },
+  "usecase-get-book": {
+    "code": "usecase GetBook(books: BookRepository)\n  exec(id: int) Result<Error, Book>\n    ~books.find(id)\n",
+    "cost": 0.0122,
+    "attempts": 1,
+    "seconds": 4.3,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "usecase-lend-book": {
+    "code": "usecase LendBook(books: BookRepository, loans: LoanRepository)\n  @transactional\n  exec(bookId: int, reader: string) Result<Error, Loan>\n    book = ~books.find(bookId)\n    if not book.available\n      return Err(Conflict(\"Book ${bookId} is not available\"))\n    book.available = false\n    ~books.save(book)\n    loan = ~loans.save(Loan(bookId = bookId, reader = reader))\n    Ok(loan)\n",
+    "cost": 0.0175,
+    "attempts": 1,
+    "seconds": 6.6,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "usecase-books-of-author": {
+    "code": "usecase BooksOfAuthor(books: BookRepository)\n  exec(author: string) Result<Error, Book[]>\n    if author.length == 0\n      Err(Invalid(\"author is empty\"))\n    else\n      Ok(~books.byAuthor(author))\n",
+    "cost": 0.0127,
+    "attempts": 1,
+    "seconds": 4.1,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "appcomponent-books": {
+    "code": "appcomponent BooksAppComponent\n  book() = GetBook.exec\n  create() = CreateBook.exec\n  byAuthor() = BooksOfAuthor.exec\n",
+    "cost": 0.0119,
+    "attempts": 1,
+    "seconds": 4.3,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "appcomponent-loans": {
+    "code": "appcomponent LoansAppComponent\n  lend() = LendBook.exec\n  giveBack() = ReturnBook.exec\n",
+    "cost": 0.0118,
+    "attempts": 1,
+    "seconds": 5.1,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "controller-books": {
+    "code": "@controller(\"books\")\ncontroller BooksController(books: BooksAppComponent)\n  @get(\"{id}\")\n  one(id: int) Result<Error, Book>\n    ~books.book(id)\n\n  @post()\n  create(input: NewBook) Result<Error, Book>\n    ~books.create(input)\n",
+    "cost": 0.0126,
+    "attempts": 1,
+    "seconds": 4.3,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "controller-author": {
+    "code": "@controller(\"authors\")\ncontroller AuthorsController(books: BooksAppComponent)\n  @get(\"{name}/books\")\n  books(name: string) Book[]\n    ~books.byAuthor(name)\n",
+    "cost": 0.0124,
+    "attempts": 1,
+    "seconds": 5.7,
+    "check": "ok",
+    "missing": [
+      "books(name: string) Result<Error, Book[]>"
+    ],
+    "pass": false
+  },
+  "controller-loans": {
+    "code": "@controller(\"loans\")\ncontroller LoansController(loans: LoansAppComponent)\n  @post(\"{bookId}\")\n  @status(201)\n  lend(bookId: int, reader: string) Result<Error, Loan>\n    ~loans.lend(bookId, reader)\n",
+    "cost": 0.0135,
+    "attempts": 1,
+    "seconds": 5.4,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "tools-books": {
+    "code": "tools BookTools(books: BooksAppComponent)\n  // Gives the title of the book with that id.\n  bookTitle(id: int) string\n    match ~books.book(id)\n      Ok(b) -> b.title\n      Err(e) -> e.message\n",
+    "cost": 0.0127,
+    "attempts": 1,
+    "seconds": 4.4,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "tools-loans": {
+    "code": "tools LoanTools(loans: LoansAppComponent)\n  // Lends a book to a reader.\n  lend(bookId: int, reader: string) string\n    match ~loans.lend(bookId, reader)\n      Ok(l) -> \"loan ${l.id}\"\n      Err(e) -> e.message\n",
+    "cost": 0.0126,
+    "attempts": 1,
+    "seconds": 4.4,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "agent-librarian": {
+    "code": "// Helps readers find books.\nagent Librarian(tools: BookTools)\n  prompt: string = \"You help readers find books. Use the tools; never invent ids.\"\n",
+    "cost": 0.0252,
+    "attempts": 2,
+    "seconds": 11.7,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "agent-loans": {
+    "code": "agent LoanDesk(tools: LoanTools)\n  model: string = \"coder\"\n  prompt: string = \"You lend books. Confirm every loan.\"\n",
+    "cost": 0.0442,
+    "attempts": 2,
+    "seconds": 13.2,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "graph-summary": {
+    "code": "state SummaryState\n  question: string\n  answer: string\n\n@state(SummaryState)\ngraph Summary(librarian: Librarian)\n  @start\n  ask(state: SummaryState) <string, string>\n    { \"answer\": ~librarian.ask(state.question) }\n",
+    "cost": 0.0159,
+    "attempts": 1,
+    "seconds": 6.3,
+    "check": "ok",
+    "missing": [
+      "@next(\"end\")"
+    ],
+    "pass": false
+  },
+  "graph-two-steps": {
+    "code": "// State of the review graph.\nstate ReviewState\n  text: string\n  draft: string\n  final: string\n\n// Drafts an answer and then shortens it.\n@state(ReviewState)\ngraph Review(librarian: Librarian)\n  @start\n  @next(\"polish\")\n  draft(state: ReviewState) ReviewState\n    state.draft = ~librarian.ask(state.text)\n    state\n\n  polish(state: ReviewState) ReviewState\n    state.final = ~librarian.ask(\"Shorten: ${state.draft}\")\n    state\n",
+    "cost": 0.0178,
+    "attempts": 1,
+    "seconds": 7.9,
+    "check": "ok",
+    "missing": [
+      "@next(\"end\")"
+    ],
+    "pass": false
+  },
+  "tests-create-book": {
+    "code": "tests Books\n  books: BooksAppComponent = inject<BooksAppComponent>()\n\n  @test(\"creates a book and refuses the same title\")\n  checkDuplicate()\n    book = NewBook(title = \"Dune\", author = \"Herbert\", year = 1965)\n    first = ~books.create(book)\n    expect(first.isOk)\n    second = ~books.create(book)\n    expect(second.error.status == 409)\n",
+    "cost": 0.0284,
+    "attempts": 2,
+    "seconds": 9.9,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "tests-missing-book": {
+    "code": "tests Missing\n  @test(\"a missing book is 404\")\n  missingBook()\n    app = inject<BooksAppComponent>()\n    result = ~app.book(999)\n    match result\n      Err(e) -> expect(e.status == 404)\n      Ok(_) -> expect(false)\n",
+    "cost": 0.0121,
+    "attempts": 1,
+    "seconds": 4.7,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "listener-loans": {
+    "code": "listener BookEvents(books: BooksAppComponent)\n  @consumer(\"books.created\")\n  created(input: NewBook)\n    ~books.create(input)\n",
+    "cost": 0.012,
+    "attempts": 1,
+    "seconds": 4.5,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "flutter-model": {
+    "code": "Book\n  id: int\n  title: string\n  author: string\n",
+    "cost": 0.0346,
+    "attempts": 1,
+    "seconds": 4.1,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "flutter-repository": {
+    "code": "@repository(path = \"books\")\nrepository BookRepository\n  @get(path = \":id\")\n  book(id: int) Result<Error, Book>\n",
+    "cost": 0.0119,
+    "attempts": 1,
+    "seconds": 3.5,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "service-isbn": {
+    "code": "// Validates ISBN-13 codes by length only.\nservice Isbn\n  valid(code: string) boolean\n    code.replace(\"-\", \"\").length == 13\n",
+    "cost": 0.012,
+    "attempts": 1,
+    "seconds": 4.1,
+    "check": "ok",
+    "missing": [
+      "replaceAll(\"-\", \"\")"
+    ],
+    "pass": false
+  },
+  "function-label": {
+    "code": "// Classifies a book by its age.\nservice Labels\n  age(year: int, now: int) string\n    if now - year < 2\n      \"new\"\n    else if now - year < 10\n      \"recent\"\n    else\n      \"classic\"\n",
+    "cost": 0.012,
+    "attempts": 1,
+    "seconds": 4.6,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "flutter-usecase": {
+    "code": "usecase AllBooksUseCase\n  (books: BookRepository)\n\n  exec() Result<BookError, Book[]>\n    ~books.all()\n",
+    "cost": 0.0558,
+    "attempts": 1,
+    "seconds": 4.2,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "flutter-state-model": {
+    "code": "BooksState\n  (loaded: Book[], error: BookError, loading: boolean)\n",
+    "cost": 0.0426,
+    "attempts": 1,
+    "seconds": 3.3,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "flutter-manager": {
+    "code": "@stateModel(BooksState)\nstatemanager BooksManager\n  (books: BooksComponent)\n    load()\n\n  @state(BooksState.loading)\n  loading()\n\n  @before(loading)\n  @state(BooksState.loaded)\n  load() Result<BookError, Book[]>\n    ~books.all()\n",
+    "cost": 0.0146,
+    "attempts": 1,
+    "seconds": 3.6,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "flutter-screen": {
+    "code": "@screen(route = \"/books\", providers = [BooksManager])\nstateless BooksScreen\n  build(context: BuildContext) Widget\n    Scaffold(\n      appBar = AppBar(title = Text(\"Books\")),\n      body = BooksStateBuilder<BooksManager>(\n        loading = () => Center(child = CircularProgressIndicator()),\n        loaded = (books) => ListView(\n          children = books.map((book) => ListTile(title = Text(book.title))),\n        ),\n        error = (e) => Center(child = Text(e.message)),\n      ),\n    )\n",
+    "cost": 0.0324,
+    "attempts": 2,
+    "seconds": 8.6,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "flutter-repository-post": {
+    "code": "@repository(path = \"books\")\nrepository BookRepository\n  @post(retry = 1)\n  save(book: Book) Result<BookError, Book>\n",
+    "cost": 0.0317,
+    "attempts": 1,
+    "seconds": 7.1,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "web-service": {
+    "code": "service BookFilters()\n  available(books: Book[]) Book[]\n    books.filter(book => book.available)\n",
+    "cost": 0.0131,
+    "attempts": 1,
+    "seconds": 3.3,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "feature-books-by-author": {
+    "code": "// file: components/books/data/entities/book.nuc\n@entity(\"books\")\nentity Book()\n  @primary(generated = true)\n  id: int\n  title: string\n  author: string\n\n// file: components/books/data/repositories/book_repository.nuc\nrepository BookRepository\n  byAuthor(author: string) Book[]\n    where({ \"author\": author })\n    orderBy(\"title\")\n    getMany()\n\n// file: components/books/domain/usecases/books_of_author.nuc\nusecase BooksOfAuthor(books: BookRepository)\n  exec(author: string) Result<Error, Book[]>\n    Ok(~books.byAuthor(author))\n\n// file: components/books/books_app_component.nuc\nappcomponent BooksAppComponent\n  booksOf() = BooksOfAuthor.exec\n\n// file: components/books/api/books_controller.nuc\n@controller(\"books\")\ncontroller BooksController(books: BooksAppComponent)\n  @get(\"author/{author}\")\n  byAuthor(author: string) Result<Error, Book[]>\n    ~books.booksOf(author)\n",
+    "files": {
+      "components/books/data/entities/book.nuc": "@entity(\"books\")\nentity Book()\n  @primary(generated = true)\n  id: int\n  title: string\n  author: string\n",
+      "components/books/data/repositories/book_repository.nuc": "repository BookRepository\n  byAuthor(author: string) Book[]\n    where({ \"author\": author })\n    orderBy(\"title\")\n    getMany()\n",
+      "components/books/domain/usecases/books_of_author.nuc": "usecase BooksOfAuthor(books: BookRepository)\n  exec(author: string) Result<Error, Book[]>\n    Ok(~books.byAuthor(author))\n",
+      "components/books/books_app_component.nuc": "appcomponent BooksAppComponent\n  booksOf() = BooksOfAuthor.exec\n",
+      "components/books/api/books_controller.nuc": "@controller(\"books\")\ncontroller BooksController(books: BooksAppComponent)\n  @get(\"author/{author}\")\n  byAuthor(author: string) Result<Error, Book[]>\n    ~books.booksOf(author)\n"
+    },
+    "cost": 0.0448,
+    "attempts": 1,
+    "seconds": 10.9,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "feature-new-reader": {
+    "code": "// file: components/readers/data/entities/reader.nuc\n@entity(\"readers\")\nentity Reader()\n  @primary(generated = true)\n  id: int\n  name: string\n  @column(unique = true)\n  email: string\n\n// file: components/readers/domain/models/new_reader.nuc\nmodel NewReader()\n  @minLength(2)\n  name: string\n  @email\n  email: string\n\n// file: components/readers/data/repositories/reader_repository.nuc\nrepository ReaderRepository\n\n// file: components/readers/domain/usecases/create_reader.nuc\nusecase CreateReader(readers: ReaderRepository)\n  exec(input: NewReader) Result<Error, Reader>\n    reader = ~readers.save(Reader(name = input.name, email = input.email))\n    Ok(reader)\n\n// file: components/readers/readers_app_component.nuc\nappcomponent ReadersAppComponent\n  create() = CreateReader.exec\n\n// file: components/readers/api/readers_controller.nuc\n@controller(\"readers\")\ncontroller ReadersController(readers: ReadersAppComponent)\n  @post(status = 201)\n  create(input: NewReader) Result<Error, Reader>\n    ~readers.create(input)\n",
+    "files": {
+      "components/readers/data/entities/reader.nuc": "@entity(\"readers\")\nentity Reader()\n  @primary(generated = true)\n  id: int\n  name: string\n  @column(unique = true)\n  email: string\n",
+      "components/readers/domain/models/new_reader.nuc": "model NewReader()\n  @minLength(2)\n  name: string\n  @email\n  email: string\n",
+      "components/readers/data/repositories/reader_repository.nuc": "repository ReaderRepository\n",
+      "components/readers/domain/usecases/create_reader.nuc": "usecase CreateReader(readers: ReaderRepository)\n  exec(input: NewReader) Result<Error, Reader>\n    reader = ~readers.save(Reader(name = input.name, email = input.email))\n    Ok(reader)\n",
+      "components/readers/readers_app_component.nuc": "appcomponent ReadersAppComponent\n  create() = CreateReader.exec\n",
+      "components/readers/api/readers_controller.nuc": "@controller(\"readers\")\ncontroller ReadersController(readers: ReadersAppComponent)\n  @post(status = 201)\n  create(input: NewReader) Result<Error, Reader>\n    ~readers.create(input)\n"
+    },
+    "cost": 0.0272,
+    "attempts": 1,
+    "seconds": 10.6,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "web-repository": {
+    "code": "@repository(path = \"books\")\nrepository BookRepository\n  @get(path = \":id\")\n  getOne(id: int) Result<BookError, Book>\n\n  @get(cache = true, ttl = 60000)\n  all() Result<BookError, Book[]>\n",
+    "cost": 0.0326,
+    "attempts": 1,
+    "seconds": 4.4,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "web-tile": {
+    "code": "stateless BookTile(book: Book)\n  build() Element\n    li(\n      className = \"tile\",\n      children = [span(className = \"title\", children = book.title), small(children = book.author)],\n    )\n",
+    "cost": 0.0136,
+    "attempts": 1,
+    "seconds": 3.4,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "web-manager": {
+    "code": "@stateModel(BooksState)\nstatemanager BooksManager\n  (books: BooksComponent)\n    load()\n\n  @state(BooksState.loading)\n  loading()\n\n  @before(loading)\n  @state(BooksState.loaded)\n  load() Result<BookError, Book[]>\n    ~books.all()\n",
+    "cost": 0.0143,
+    "attempts": 1,
+    "seconds": 3.5,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "web-appcomponent": {
+    "code": "appcomponent BooksComponent\n  all() = AllBooksUseCase.exec\n  one() = GetBookUseCase.exec\n",
+    "cost": 0.0133,
+    "attempts": 1,
+    "seconds": 3.5,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  },
+  "feature-books-list-app": {
+    "code": "// file: components/books/domain/models/book.nuc\nBook\n  id: int\n  title: string\n\n// file: components/books/domain/models/book_error.nuc\nBookError\n  message: string\n\n// file: components/books/data/book_repository.nuc\n@repository(path = \"books\")\nrepository BookRepository\n  @get()\n  all() Result<BookError, Book[]>\n\n// file: components/books/domain/usecases/all_books_use_case.nuc\nusecase AllBooksUseCase\n  (books: BookRepository)\n\n  exec() Result<BookError, Book[]>\n    ~books.all()\n\n// file: components/books/books_component.nuc\nappcomponent BooksComponent\n  all() = AllBooksUseCase.exec\n",
+    "files": {
+      "components/books/domain/models/book.nuc": "Book\n  id: int\n  title: string\n",
+      "components/books/domain/models/book_error.nuc": "BookError\n  message: string\n",
+      "components/books/data/book_repository.nuc": "@repository(path = \"books\")\nrepository BookRepository\n  @get()\n  all() Result<BookError, Book[]>\n",
+      "components/books/domain/usecases/all_books_use_case.nuc": "usecase AllBooksUseCase\n  (books: BookRepository)\n\n  exec() Result<BookError, Book[]>\n    ~books.all()\n",
+      "components/books/books_component.nuc": "appcomponent BooksComponent\n  all() = AllBooksUseCase.exec\n"
+    },
+    "cost": 0.0077,
+    "attempts": 1,
+    "seconds": 11.0,
+    "check": "ok",
+    "missing": [],
+    "pass": true
+  }
+}

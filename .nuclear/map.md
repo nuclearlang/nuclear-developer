@@ -1,0 +1,124 @@
+# Project map: nuclear_developer (backend)
+
+Written by `nuclear check` and `nuclear build`: every declaration with its kind, its description (its doc comment) and its members, in Nuclear. Read it before writing; a declaration without a description gets one with a `//` line above it.
+
+## Component `developer`
+
+- `components/developer/ai/assistant.nuc`
+  - graph `Assistant(bench: Workbench)` — The assistant: answers a message of the chat about the project, with the graph's knowledge, the project's map and the last messages of the session. It explains and proposes Nuclear; it changes no file (an order to change the project is a Loop run). Prompt: agents/chat.md.
+    - `@start @next("answer") recall(state: PieceState) <string, any>`
+    - `@next("end") answer(state: PieceState) <string, any>`
+- `components/developer/ai/coder.nuc`
+  - graph `Coder(bench: Workbench)` — The coder: writes one .nuc file from a precise task, with the graph's guide, knowledge and examples, and repairs it until `nuclear check` reports no errors. Prompts: agents/piece.md, agents/repair.md.
+    - `@start @next("write") recall(state: PieceState) <string, any>`
+    - `@next("end") write(state: PieceState) <string, any>`
+- `components/developer/ai/diagnoser.nuc`
+  - graph `Diagnoser(bench: Workbench, toolchain: Toolchain)` — The diagnoser: tells why a step of the pipeline failed and what to do next. The kind of failure comes from fixed rules (a small model guesses it badly), the evidence from the tools (the compiler for code, `dragonfly doctor` for the environment), and the local model explains it in plain words. It changes nothing. Prompt: agents/diagnose.md.
+    - `@start @next("explain") gather(state: PieceState) <string, any>`
+    - `@next("end") explain(state: PieceState) <string, any>`
+    - `classify(text: string) string` — The kind of a failure from its text, the first rule that matches: transient (the services or the network: retrying helps), environment (a tool or a package is missing), code (the compiler's errors), test (a test failed), spec (nothing to do was understood), else unknown.
+    - `tail(text: string, size: int) string` — The last `size` characters of a text (the end of a log is where it says what failed).
+    - `actionOf(kind: string) string` — What to do about each kind of failure.
+- `components/developer/ai/documenter.nuc`
+  - graph `Documenter(bench: Workbench)` — The documenter: reads the journal of a run (what every agent did, step by step) and writes what was done in plain English for the person or the frontier model that reviews it. It documents; it does not change the code. Prompt: agents/document.md (over the `docs` guide).
+    - `@start @next("write") recall(state: PieceState) <string, any>`
+    - `@next("end") write(state: PieceState) <string, any>`
+- `components/developer/ai/planner.nuc`
+  - graph `Planner(bench: Workbench, toolchain: Toolchain)` — The planner: splits a spec into pieces of one file each, in the order they can be written (the local plan when no frontier model leads the work). The model names each piece's kind, declaration, component and screen; its path comes from the platform's layout (`nuclear help layout`), so a small model never guesses a folder. Prompts: agents/plan.md, agents/plan-again.md.
+    - `@start @next("split") recall(state: PieceState) <string, any>`
+    - `@next("end") split(state: PieceState) <string, any>`
+    - `pieces(raw: string, platform: string, spec: string) <string, string>[]` — The lines `kind | Name | component | screen | what` → pieces with the layout's path. A small model may move the columns: the kind is the cell the layout knows, the name the first one in PascalCase. Left out: a line without both, a name already planned and, when the spec names its declarations, a name it does not (the planner splits the spec; it does not design more). A component that is not a plain name takes the one the other lines give. Each piece's task ends with the spec's own sentence about it: the model's summary may lose a detail.
+- `components/developer/ai/security.nuc`
+  - graph `Security(bench: Workbench, toolchain: Toolchain)` — The security reviewer: the compiler's check plus a review guided by the graph's security rules. It reports; it does not change the code. Prompt: agents/security.md.
+    - `@start @next("review") recall(state: PieceState) <string, any>`
+    - `@next("end") review(state: PieceState) <string, any>`
+- `components/developer/ai/states/piece_state.nuc`
+  - state `PieceState` — The state of one piece of work of a local agent: the task, what the graph gave it, its answer and its check.
+    - `task: string`
+    - `platform: string`
+    - `path: string`
+    - `kind: string`
+    - `context: string`
+    - `map: string` — the chat: the project's map and the last messages of the session
+    - `history: string`
+    - `failure: string` — the diagnoser: the kind of a failure (transient, environment, code, test, spec, unknown)
+    - `guide: string`
+    - `knowledge: string`
+    - `examples: string`
+    - `code: string`
+    - `report: string`
+    - `check: string`
+    - `attempts: int`
+    - `pieces: <string, string>[]`
+    - `trace: <string, string>[]`
+- `components/developer/ai/tester.nuc`
+  - graph `Tester(bench: Workbench)` — The tester: writes the Nuclear tests (`tests` kind) of a piece of code, checked like any other file. Prompts: agents/test.md (over the `test` guide), agents/piece.md, agents/repair.md.
+    - `@start @next("write") recall(state: PieceState) <string, any>`
+    - `@next("end") write(state: PieceState) <string, any>`
+- `components/developer/ai/workbench.nuc`
+  - tools `Workbench(knowledge: GraphClient, toolchain: Toolchain)` — What every local agent shares: the Nuclear Smart Graph, the NuclearLang tools and the models. No method has a doc comment, so none is offered to a model as a tool: the graphs call them in a fixed order, because a small model follows steps better than it chooses tools.  The prompts are files of the graph (`nuclear-graph/src/nuclear_graph/prompts/agents/<name>.md`), read with `prompt(name, values)`: nothing a model reads is written inside this code.
+    - `recall(query: string, platform: string, useCase: string) Recall`
+    - `prompt(name: string, values: <string, string>) string` — The prompt file `agents/<name>.md` with each `{{key}}` filled. A `## ` section whose body is left empty is dropped, so a model never reads an empty heading.
+    - `compose(state: PieceState) string` — The prompt of a piece: the guide of the use case, then the knowledge, the examples, the files it depends on and the task, so the most important text is the last one the model reads.
+    - `ask(model: string, prompt: string) string`
+    - `write(state: PieceState, request: string, tries: int) PieceReply` — Writes the code of a piece from its prompt (`request`) and repairs it with the compiler's errors, at most `tries` times.
+    - `step(name: string, detail: string) <string, string>`
+    - `firstLine(text: string) string`
+- `components/developer/api/developer_controller.nuc`
+  - controller `DeveloperController(coder: Coder, tester: Tester, security: Security, documenter: Documenter, assistant: Assistant, diagnoser: Diagnoser, planner: Planner)` — The local developer over HTTP (127.0.0.1:7879): POST /developer/code, /test, /security, /document, /chat, /diagnose and /plan. Each request runs on a thread of its own, so nothing of one request reaches the next.
+    - `@post("code", status = 200) code(input: PieceRequest) PieceReply`
+    - `@post("test", status = 200) test(input: PieceRequest) PieceReply`
+    - `@post("security", status = 200) review(input: PieceRequest) PieceReply`
+    - `@post("document", status = 200) document(input: PieceRequest) PieceReply`
+    - `@post("chat", status = 200) chat(input: ChatRequest) PieceReply`
+    - `@post("diagnose", status = 200) diagnose(input: PieceRequest) PieceReply` — Why a step failed: `task` is the step, `context` its output, `path` the project's folder.
+    - `@post("plan", status = 200) plan(input: PlanRequest) PlanReply`
+    - `fresh() string`
+    - `start(input: PieceRequest) <string, any>`
+    - `reply(state: <string, any>) PieceReply`
+- `components/developer/domain/models/developer_models.nuc`
+  - model `PieceRequest` — One piece of work for a local agent: ONE file, named as precisely as possible.
+    - `@minLength(3) task: string`
+    - `platform: string` — backend, mobile or web: the agents write Nuclear for a platform, never for a dialect
+    - `path: string`
+    - `kind: string`
+    - `context: string`
+  - model `PieceReply` — What an agent answers: the code (or the review), its check and what it did, step by step.
+    - `code: string`
+    - `report: string`
+    - `check: string`
+    - `attempts: int`
+    - `trace: <string, string>[]`
+  - model `PlanRequest` — A spec to split into pieces.
+    - `@minLength(3) spec: string`
+    - `platform: string` — backend, mobile or web: the agents write Nuclear for a platform, never for a dialect
+  - model `PlanReply` — The pieces of a plan, in the order they can be written.
+    - `pieces: <string, string>[]`
+    - `raw: string`
+    - `trace: <string, string>[]`
+  - model `Recall` — What the Nuclear Smart Graph gave an agent for a task.
+    - `guide: string`
+    - `knowledge: string`
+    - `examples: string`
+    - `note: string`
+  - model `ChatRequest` — A message to the local assistant, with what it needs to answer about the project.
+    - `@minLength(1) message: string`
+    - `platform: string` — backend, mobile or web
+    - `map: string` — the project's map (.nuclear/map.md): every declaration with its kind, description and members
+    - `history: string` — the last messages of the session, oldest first, as `you: ...` / `agent: ...` lines
+
+## `config/`
+
+- `config/project_config.nuc`
+  - appConfig `ProjectConfig` — The models of the local agents, both on Ollama: a small coder model writes the code, a small general model plans and reviews. Neither may be larger than 3B parameters of effective size (the user's rule). Their context window is CONTEXT_TOKENS (8192 by default; the editor passes its nuclear.ai.contextTokens).
+    - `connections: Connection[]`
+
+## `test/`
+
+- `test/workbench_test.nuc`
+  - tests `WorkbenchTests` — The parts of the agents that need no model: how a prompt is put together, an unreachable graph, the compiler.
+    - `@test("the prompt file starts with the guide, ends with the task and drops an empty section") compose() void`
+    - `@test("an unreachable graph is a note, not an error") unreachable() void`
+    - `@test("the compiler accepts valid Nuclear and explains invalid Nuclear") check() void`
+    - `@test("a plan's paths come from the platform's layout, and the spec corrects what the model forgot or mislabeled") plan() void`
+    - `@test("a failure is classified by rules, and each kind says what to do") classify() void`

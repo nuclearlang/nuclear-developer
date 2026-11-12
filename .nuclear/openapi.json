@@ -1,0 +1,481 @@
+{
+  "components": {
+    "schemas": {
+      "ChatRequest": {
+        "description": "A message to the local assistant, with what it needs to answer about the project.",
+        "properties": {
+          "history": {
+            "default": "",
+            "description": "the last messages of the session, oldest first, as `you: ...` / `agent: ...` lines",
+            "type": "string"
+          },
+          "map": {
+            "default": "",
+            "description": "the project's map (.nuclear/map.md): every declaration with its kind, description and members",
+            "type": "string"
+          },
+          "message": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "platform": {
+            "default": "backend",
+            "description": "backend, mobile or web",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "Error": {
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "PieceReply": {
+        "description": "What an agent answers: the code (or the review), its check and what it did, step by step.",
+        "properties": {
+          "attempts": {
+            "type": "integer"
+          },
+          "check": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "report": {
+            "type": "string"
+          },
+          "trace": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "report",
+          "check",
+          "attempts",
+          "trace"
+        ],
+        "type": "object"
+      },
+      "PieceRequest": {
+        "description": "One piece of work for a local agent: ONE file, named as precisely as possible.",
+        "properties": {
+          "context": {
+            "default": "",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "type": "string"
+          },
+          "path": {
+            "default": "",
+            "type": "string"
+          },
+          "platform": {
+            "default": "backend",
+            "description": "backend, mobile or web: the agents write Nuclear for a platform, never for a dialect",
+            "type": "string"
+          },
+          "task": {
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "type": "object"
+      },
+      "PlanReply": {
+        "description": "The pieces of a plan, in the order they can be written.",
+        "properties": {
+          "pieces": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "raw": {
+            "type": "string"
+          },
+          "trace": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "pieces",
+          "raw",
+          "trace"
+        ],
+        "type": "object"
+      },
+      "PlanRequest": {
+        "description": "A spec to split into pieces.",
+        "properties": {
+          "platform": {
+            "default": "backend",
+            "description": "backend, mobile or web: the agents write Nuclear for a platform, never for a dialect",
+            "type": "string"
+          },
+          "spec": {
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "type": "object"
+      },
+      "Recall": {
+        "description": "What the Nuclear Smart Graph gave an agent for a task.",
+        "properties": {
+          "examples": {
+            "type": "string"
+          },
+          "guide": {
+            "type": "string"
+          },
+          "knowledge": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "guide",
+          "knowledge",
+          "examples",
+          "note"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "nuclear_developer",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/developer/chat": {
+      "post": {
+        "operationId": "DeveloperController.chat",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PieceReply"
+                }
+              }
+            },
+            "description": "ok"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "the error of the use case"
+          }
+        },
+        "tags": [
+          "developer"
+        ]
+      }
+    },
+    "/developer/code": {
+      "post": {
+        "operationId": "DeveloperController.code",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PieceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PieceReply"
+                }
+              }
+            },
+            "description": "ok"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "the error of the use case"
+          }
+        },
+        "tags": [
+          "developer"
+        ]
+      }
+    },
+    "/developer/diagnose": {
+      "post": {
+        "operationId": "DeveloperController.diagnose",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PieceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PieceReply"
+                }
+              }
+            },
+            "description": "ok"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "the error of the use case"
+          }
+        },
+        "summary": "Why a step failed: `task` is the step, `context` its output, `path` the project's folder.",
+        "tags": [
+          "developer"
+        ]
+      }
+    },
+    "/developer/document": {
+      "post": {
+        "operationId": "DeveloperController.document",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PieceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PieceReply"
+                }
+              }
+            },
+            "description": "ok"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "the error of the use case"
+          }
+        },
+        "tags": [
+          "developer"
+        ]
+      }
+    },
+    "/developer/plan": {
+      "post": {
+        "operationId": "DeveloperController.plan",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanReply"
+                }
+              }
+            },
+            "description": "ok"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "the error of the use case"
+          }
+        },
+        "tags": [
+          "developer"
+        ]
+      }
+    },
+    "/developer/security": {
+      "post": {
+        "operationId": "DeveloperController.review",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PieceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PieceReply"
+                }
+              }
+            },
+            "description": "ok"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "the error of the use case"
+          }
+        },
+        "tags": [
+          "developer"
+        ]
+      }
+    },
+    "/developer/test": {
+      "post": {
+        "operationId": "DeveloperController.test",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PieceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PieceReply"
+                }
+              }
+            },
+            "description": "ok"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "the error of the use case"
+          }
+        },
+        "tags": [
+          "developer"
+        ]
+      }
+    }
+  }
+}

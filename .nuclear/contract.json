@@ -1,0 +1,260 @@
+{
+  "app": "nuclear_developer",
+  "controllers": {
+    "DeveloperController": {
+      "component": "developer",
+      "description": "The local developer over HTTP (127.0.0.1:7879): POST /developer/code, /test, /security, /document, /chat, /diagnose and /plan. Each request runs on a thread of its own, so nothing of one request reaches the next.",
+      "path": "developer",
+      "routes": [
+        {
+          "name": "code",
+          "params": [
+            {
+              "in": "body",
+              "name": "input",
+              "type": "PieceRequest"
+            }
+          ],
+          "path": "code",
+          "returns": "PieceReply",
+          "verb": "post"
+        },
+        {
+          "name": "test",
+          "params": [
+            {
+              "in": "body",
+              "name": "input",
+              "type": "PieceRequest"
+            }
+          ],
+          "path": "test",
+          "returns": "PieceReply",
+          "verb": "post"
+        },
+        {
+          "name": "review",
+          "params": [
+            {
+              "in": "body",
+              "name": "input",
+              "type": "PieceRequest"
+            }
+          ],
+          "path": "security",
+          "returns": "PieceReply",
+          "verb": "post"
+        },
+        {
+          "name": "document",
+          "params": [
+            {
+              "in": "body",
+              "name": "input",
+              "type": "PieceRequest"
+            }
+          ],
+          "path": "document",
+          "returns": "PieceReply",
+          "verb": "post"
+        },
+        {
+          "name": "chat",
+          "params": [
+            {
+              "in": "body",
+              "name": "input",
+              "type": "ChatRequest"
+            }
+          ],
+          "path": "chat",
+          "returns": "PieceReply",
+          "verb": "post"
+        },
+        {
+          "description": "Why a step failed: `task` is the step, `context` its output, `path` the project's folder.",
+          "name": "diagnose",
+          "params": [
+            {
+              "in": "body",
+              "name": "input",
+              "type": "PieceRequest"
+            }
+          ],
+          "path": "diagnose",
+          "returns": "PieceReply",
+          "verb": "post"
+        },
+        {
+          "name": "plan",
+          "params": [
+            {
+              "in": "body",
+              "name": "input",
+              "type": "PlanRequest"
+            }
+          ],
+          "path": "plan",
+          "returns": "PlanReply",
+          "verb": "post"
+        }
+      ]
+    }
+  },
+  "dialect": "fastapi",
+  "models": {
+    "ChatRequest": {
+      "description": "A message to the local assistant, with what it needs to answer about the project.",
+      "fields": [
+        {
+          "name": "message",
+          "rules": {
+            "minLength": 1
+          },
+          "type": "string"
+        },
+        {
+          "default": "backend",
+          "description": "backend, mobile or web",
+          "name": "platform",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "description": "the project's map (.nuclear/map.md): every declaration with its kind, description and members",
+          "name": "map",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "description": "the last messages of the session, oldest first, as `you: ...` / `agent: ...` lines",
+          "name": "history",
+          "type": "string"
+        }
+      ],
+      "key": null
+    },
+    "PieceReply": {
+      "description": "What an agent answers: the code (or the review), its check and what it did, step by step.",
+      "fields": [
+        {
+          "name": "code",
+          "type": "string"
+        },
+        {
+          "name": "report",
+          "type": "string"
+        },
+        {
+          "name": "check",
+          "type": "string"
+        },
+        {
+          "name": "attempts",
+          "type": "int"
+        },
+        {
+          "name": "trace",
+          "type": "<string, string>[]"
+        }
+      ],
+      "key": null
+    },
+    "PieceRequest": {
+      "description": "One piece of work for a local agent: ONE file, named as precisely as possible.",
+      "fields": [
+        {
+          "name": "task",
+          "rules": {
+            "minLength": 3
+          },
+          "type": "string"
+        },
+        {
+          "default": "backend",
+          "description": "backend, mobile or web: the agents write Nuclear for a platform, never for a dialect",
+          "name": "platform",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "name": "kind",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "name": "context",
+          "type": "string"
+        }
+      ],
+      "key": null
+    },
+    "PlanReply": {
+      "description": "The pieces of a plan, in the order they can be written.",
+      "fields": [
+        {
+          "name": "pieces",
+          "type": "<string, string>[]"
+        },
+        {
+          "name": "raw",
+          "type": "string"
+        },
+        {
+          "name": "trace",
+          "type": "<string, string>[]"
+        }
+      ],
+      "key": null
+    },
+    "PlanRequest": {
+      "description": "A spec to split into pieces.",
+      "fields": [
+        {
+          "name": "spec",
+          "rules": {
+            "minLength": 3
+          },
+          "type": "string"
+        },
+        {
+          "default": "backend",
+          "description": "backend, mobile or web: the agents write Nuclear for a platform, never for a dialect",
+          "name": "platform",
+          "type": "string"
+        }
+      ],
+      "key": null
+    },
+    "Recall": {
+      "description": "What the Nuclear Smart Graph gave an agent for a task.",
+      "fields": [
+        {
+          "name": "guide",
+          "type": "string"
+        },
+        {
+          "name": "knowledge",
+          "type": "string"
+        },
+        {
+          "name": "examples",
+          "type": "string"
+        },
+        {
+          "name": "note",
+          "type": "string"
+        }
+      ],
+      "key": null
+    }
+  },
+  "platform": "backend",
+  "repositories": {},
+  "version": "0.1.0"
+}

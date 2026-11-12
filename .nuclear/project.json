@@ -1,0 +1,34 @@
+{
+  "dialect": "fastapi",
+  "kinds": {
+    "agent": "platform:backend",
+    "aggregate": "platform:backend",
+    "appConfig": "platform:backend",
+    "appcomponent": "platform:backend",
+    "config": "platform:backend",
+    "controller": "platform:backend",
+    "entity": "platform:backend",
+    "graph": "platform:backend",
+    "listener": "platform:backend",
+    "model": "platform:backend",
+    "repository": "platform:backend",
+    "service": "platform:backend",
+    "state": "platform:backend",
+    "tests": "platform:backend",
+    "tools": "platform:backend",
+    "usecase": "platform:backend"
+  },
+  "language": "python",
+  "name": "nuclear_developer",
+  "output": "build",
+  "platform": "backend",
+  "plugins": [
+    "ai",
+    "ollama"
+  ],
+  "toolchain": {
+    "installed": ".venv",
+    "serve": null,
+    "url": "http://localhost:8000"
+  }
+}

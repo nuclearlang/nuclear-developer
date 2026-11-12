@@ -1,0 +1,332 @@
+{
+  "1": {
+    "train": {
+      "tasks": 20,
+      "sonnet": 10,
+      "local": 14,
+      "equivalent": 7
+    },
+    "test": {
+      "tasks": 12,
+      "sonnet": 5,
+      "local": 9,
+      "equivalent": 4
+    },
+    "all": {
+      "tasks": 32,
+      "sonnet": 15,
+      "local": 23,
+      "equivalent": 11
+    },
+    "cost_usd": 0.28,
+    "local_seconds": 88.9
+  },
+  "2": {
+    "train": {
+      "tasks": 20,
+      "sonnet": 15,
+      "local": 18,
+      "equivalent": 15
+    },
+    "test": {
+      "tasks": 12,
+      "sonnet": 10,
+      "local": 8,
+      "equivalent": 8
+    },
+    "all": {
+      "tasks": 32,
+      "sonnet": 25,
+      "local": 26,
+      "equivalent": 23
+    },
+    "cost_usd": 0.55,
+    "local_seconds": 80.1
+  },
+  "3": {
+    "train": {
+      "tasks": 20,
+      "sonnet": 15,
+      "local": 18,
+      "equivalent": 15
+    },
+    "test": {
+      "tasks": 12,
+      "sonnet": 10,
+      "local": 10,
+      "equivalent": 9
+    },
+    "all": {
+      "tasks": 32,
+      "sonnet": 25,
+      "local": 28,
+      "equivalent": 24
+    },
+    "cost_usd": 0.55,
+    "local_seconds": 91.3
+  },
+  "4": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 24,
+      "equivalent": 20
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 14,
+      "equivalent": 14
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 38,
+      "equivalent": 34
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 386.2
+  },
+  "5": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 24,
+      "equivalent": 20
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 14,
+      "equivalent": 14
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 38,
+      "equivalent": 34
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 457.5
+  },
+  "6": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 24,
+      "equivalent": 20
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 14,
+      "equivalent": 13
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 38,
+      "equivalent": 33
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 470.0
+  },
+  "7": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 24,
+      "equivalent": 20
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 14,
+      "equivalent": 13
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 38,
+      "equivalent": 33
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 363.6
+  },
+  "8": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 23,
+      "equivalent": 20
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 14,
+      "equivalent": 13
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 37,
+      "equivalent": 33
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 348.3
+  },
+  "9": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 23,
+      "equivalent": 20
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 14,
+      "equivalent": 13
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 37,
+      "equivalent": 33
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 333.0
+  },
+  "10": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 24,
+      "equivalent": 21
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 13,
+      "equivalent": 13
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 37,
+      "equivalent": 34
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 341.5
+  },
+  "11": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 24,
+      "equivalent": 21
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 13,
+      "equivalent": 13
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 37,
+      "equivalent": 34
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 333.7
+  },
+  "12": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 21,
+      "equivalent": 20
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 8,
+      "equivalent": 8
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 29,
+      "equivalent": 28
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 340.5
+  },
+  "13": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 23,
+      "equivalent": 20
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 15,
+      "equivalent": 15
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 38,
+      "equivalent": 35
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 349.6
+  },
+  "15": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 23,
+      "equivalent": 20
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 15,
+      "equivalent": 15
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 38,
+      "equivalent": 35
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 330.1
+  },
+  "17": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 23,
+      "equivalent": 20
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 14,
+      "equivalent": 14
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 37,
+      "equivalent": 34
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 337.5
+  }
+}
