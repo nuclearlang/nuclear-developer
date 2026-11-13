@@ -3,7 +3,7 @@
   "controllers": {
     "DeveloperController": {
       "component": "developer",
-      "description": "The local developer over HTTP (127.0.0.1:7879): POST /developer/code, /test, /security, /document, /chat, /diagnose and /plan. Each request runs on a thread of its own, so nothing of one request reaches the next.",
+      "description": "The local developer over HTTP (127.0.0.1:7879): POST /developer/code, /test, /security, /document, /chat, /diagnose, /analyze and /plan. Each request runs on a thread of its own, so nothing of one request reaches the next.",
       "path": "developer",
       "routes": [
         {
@@ -97,12 +97,117 @@
           "path": "plan",
           "returns": "PlanReply",
           "verb": "post"
+        },
+        {
+          "description": "Which kind of request a spec is and what its strategy asks of the run: before anything is generated or planned.",
+          "name": "analyze",
+          "params": [
+            {
+              "in": "body",
+              "name": "input",
+              "type": "AnalyzeRequest"
+            }
+          ],
+          "path": "analyze",
+          "returns": "Analysis",
+          "verb": "post"
         }
       ]
     }
   },
   "dialect": "fastapi",
   "models": {
+    "Analysis": {
+      "description": "The strategy of a request (ADR-0105) and what it asks of the run: the stages that run, the generator calls (the arguments of `dragonfly gen`, each accepted by its dry run), the pieces the tools already gave (a piece with `code` is written as it is) and the facts the request lacks.",
+      "fields": [
+        {
+          "name": "strategy",
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "why",
+          "type": "string"
+        },
+        {
+          "description": "write, repair, verify, review, answer, commands or lead",
+          "name": "mode",
+          "type": "string"
+        },
+        {
+          "name": "stages",
+          "type": "string[]"
+        },
+        {
+          "description": "local, or frontier when the strategy needs a model that understands several files at once",
+          "name": "lead",
+          "type": "string"
+        },
+        {
+          "description": "where the pieces come from: plan (the planner splits what is left), declaring, naming or none",
+          "name": "source",
+          "type": "string"
+        },
+        {
+          "name": "generate",
+          "type": "string[][]"
+        },
+        {
+          "name": "pieces",
+          "type": "<string, string>[]"
+        },
+        {
+          "name": "questions",
+          "type": "string[]"
+        },
+        {
+          "name": "limits",
+          "type": "string[]"
+        },
+        {
+          "name": "report",
+          "type": "string"
+        },
+        {
+          "name": "trace",
+          "type": "<string, string>[]"
+        }
+      ],
+      "key": null
+    },
+    "AnalyzeRequest": {
+      "description": "A request to analyse before a run: which kind of request it is.",
+      "fields": [
+        {
+          "name": "spec",
+          "rules": {
+            "minLength": 3
+          },
+          "type": "string"
+        },
+        {
+          "default": "backend",
+          "name": "platform",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "description": "the project's folder: with it the analyst knows which names of the request the project has",
+          "name": "root",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "description": "the strategy the request itself names (`usecase`), when it names one",
+          "name": "strategy",
+          "type": "string"
+        }
+      ],
+      "key": null
+    },
     "ChatRequest": {
       "description": "A message to the local assistant, with what it needs to answer about the project.",
       "fields": [
@@ -129,6 +234,12 @@
           "default": "",
           "description": "the last messages of the session, oldest first, as `you: ...` / `agent: ...` lines",
           "name": "history",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "description": "the project's folder: with it the assistant reads the files that declare the names the question writes",
+          "name": "root",
           "type": "string"
         }
       ],
@@ -190,12 +301,18 @@
           "default": "",
           "name": "context",
           "type": "string"
+        },
+        {
+          "default": "",
+          "description": "the project's folder: with it an agent reads by itself the files that declare the names its task writes",
+          "name": "root",
+          "type": "string"
         }
       ],
       "key": null
     },
     "PlanReply": {
-      "description": "The pieces of a plan, in the order they can be written.",
+      "description": "The pieces of a plan, in the order they can be written; the same plan as a tree (the big parts, their tasks, the pieces of each); and what of the spec is beyond the platform or the local agents, for the user to know.",
       "fields": [
         {
           "name": "pieces",
@@ -208,6 +325,15 @@
         {
           "name": "trace",
           "type": "<string, string>[]"
+        },
+        {
+          "default": "",
+          "name": "tree",
+          "type": "string"
+        },
+        {
+          "name": "limits",
+          "type": "string[]"
         }
       ],
       "key": null
@@ -226,6 +352,12 @@
           "default": "backend",
           "description": "backend, mobile or web: the agents write Nuclear for a platform, never for a dialect",
           "name": "platform",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "description": "the project's folder: what it already declares is not planned again, and new pieces go to its components",
+          "name": "root",
           "type": "string"
         }
       ],

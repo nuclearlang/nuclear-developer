@@ -1,0 +1,59 @@
+// The parts of the analyst that need no model: the names a request introduces, the generator calls a model's lines
+// become, the two names of a rename and the facts a request lacks.
+tests AnalystTests
+  @test("the names a request introduces: the one after a kind's word, and every name of two words")
+  named() void
+    analyst = inject<Analyst>()
+    layout = { "model": "x", "usecase": "x" }
+    spoken = { "use case": "usecase", "model": "model" }
+    expect(analyst.named("Add a use case CancelOrder and a model Reader. Then test it.", layout, spoken) == ["CancelOrder", "Reader"])
+    expect(analyst.named("Rename it. The total is wrong.", layout, spoken).length == 0)
+    // only the ones a kind's word introduces: a request that has one is already designed
+    expect(analyst.named("Add a use case CancelOrder that uses OrderRepository.", layout, spoken, humps = false) == ["CancelOrder"])
+
+  @test("a model's lines become generator calls; a line with no field besides the key and no url is left out")
+  commands() void
+    analyst = inject<Analyst>()
+    raw = "authors | Author | id:int name:string birthYear:int | db | list,create\nplanets | Planet | id:int | rest:https://example.com/api/planets | list,get\nthings | Thing | id:int | db | list\nnone"
+    calls = analyst.commands(raw, "backend")
+    expect(calls.length == 2)
+    expect(calls[0] == ["resource", "authors", "Author", "--fields", "id:int name:string birthYear:int", "--source", "db", "--actions", "list,create"])
+    expect(calls[1] == ["resource", "planets", "Planet", "--from-json", "https://example.com/api/planets", "--actions", "list,get"])
+    // a component is the plural of its name
+    expect(analyst.commands("location | Location | id:int | rest:https://example.com/api/location | list", "backend")[0][1] == "locations")
+    expect(analyst.commands("category | Category | id:int name:string | db | list", "backend")[0][1] == "categories")
+    // mobile and web: the resource comes with the screen that lists it
+    expect(analyst.commands("planets | Planet | id:int | rest:https://example.com/api/planets | list", "mobile")[0] == ["resource", "planets", "Planet", "--from-json", "https://example.com/api/planets", "--actions", "list", "--screen", "planets"])
+
+  @test("the fields a request lists are counted; a request that lists none is never given to a model")
+  listed() void
+    analyst = inject<Analyst>()
+    expect(analyst.listed("An invoice has a number, a total and a paid flag. We create invoices.") == 3)
+    expect(analyst.listed("Registrar las mascotas de la clínica con su nombre, especie y edad; listarlas y borrarlas.") == 3)
+    expect(analyst.listed("Necesito llevar los productos: nombre, precio y cantidad en inventario.") == 3)
+    expect(analyst.listed("un CRUD de facturas") == 0)
+    expect(analyst.fieldsOf(["resource", "invoices", "Invoice", "--fields", "id:int total:double paid:boolean", "--source", "db"]) == 2)
+    expect(analyst.fieldsOf(["resource", "planets", "Planet", "--from-json", "https://example.com/api/planets"]) == 0)
+
+  @test("a rename is the project's name the request writes and the name it gets")
+  rename() void
+    analyst = inject<Analyst>()
+    expect(analyst.renameOf("renombra Book a Title en todo el proyecto", ["Author", "Book"]) == ["Book", "Title"])
+    expect(analyst.renameOf("the use case CancelOrder should be called RevokeOrder", ["CancelOrder"]) == ["CancelOrder", "RevokeOrder"])
+    // a field is not a declaration: nothing is renamed by guessing which `total` it is
+    expect(analyst.renameOf("rename the total to amount", ["Order"]).length == 0)
+
+  @test("a request is asked for the facts its strategy cannot start without, and for nothing it already says")
+  needs() void
+    analyst = inject<Analyst>()
+    expect(analyst.unmet("fields", "a CRUD of suppliers", "", true, 0, 0))
+    expect(not analyst.unmet("fields", "a CRUD of suppliers (name: string, phone: string)", "", true, 0, 0))
+    expect(not analyst.unmet("fields", "a CRUD of suppliers", "", true, 1, 0))
+    expect(not analyst.unmet("fields", "An entity Loan stored in the table loans: id, bookId (int) and reader (string)", "", true, 0, 0, designed = true))
+    expect(analyst.unmet("url", "list the planets of the API", "", true, 0, 0))
+    expect(not analyst.unmet("url", "GET https://example.com/planets", "", true, 0, 0))
+    expect(analyst.unmet("expected", "the total is wrong", "", true, 0, 0))
+    expect(not analyst.unmet("expected", "it should answer 409", "", true, 0, 0))
+    expect(analyst.unmet("names", "rename it", "", true, 0, 0) and not analyst.unmet("names", "rename it", "", true, 0, 2))
+    // the file a change starts in: asked for when the request names nothing of the project, never without a project
+    expect(analyst.unmet("declaration", "add a note", "", true, 0, 0) and not analyst.unmet("declaration", "add a note", "", false, 0, 0))

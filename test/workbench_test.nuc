@@ -27,13 +27,45 @@ tests WorkbenchTests
   plan() void
     planner = inject<Planner>()
     raw = "kind | Book | model | | id: int\nrepository | BookRepository | books/data | - | all()\nservice | Extra | books | - | not in the spec"
-    planned = ~planner.pieces(raw, "mobile", "A model Book (id: int). A repository BookRepository. A use case AllBooksUseCase(books: BookRepository).")
-    expect(planned.length == 3)
+    planned = ~planner.pieces(raw, "mobile", "A model Book (id: int). A repository BookRepository. A use case AllBooksUseCase(books: BookRepository). An application component BooksComponent with all() = AllBooksUseCase.exec.")
+    expect(planned.length == 4)
+    // "application component" is how people write `appcomponent`: the graph's card of the kind says so
+    expect(planned[3]["kind"] == "appcomponent" and planned[3]["path"] == "components/books/books_component.nuc")
     expect(planned[0]["path"] == "components/books/domain/models/book.nuc")
     expect(planned[1]["path"] == "components/books/data/book_repository.nuc")
     expect(planned[2]["path"] == "components/books/domain/usecases/all_books_use_case.nuc")
     expect(planned[0]["task"]! == "model Book. The spec says: A model Book (id: int)")
     expect(not ("BookRepository" in planned[0]["task"]!))
+    // in a project that has Book and BookRepository in a component `library`: what the spec only uses is not planned
+    // again, what it introduces with its kind's word is (a change of its file), and the new piece goes to that component
+    has = { "Book": "components/library/domain/models/book.nuc", "BookRepository": "components/library/data/book_repository.nuc" }
+    again = ~planner.pieces("usecase | CountBooks | books | - | exec()\nmodel | Book | books | - | id\nrepository | BookRepository | books | - | all()", "mobile", "A use case CountBooks(books: BookRepository) that counts every Book of the shelf.", has)
+    expect(again.length == 1 and again[0]["path"] == "components/library/domain/usecases/count_books.nuc")
+    changed = ~planner.pieces("repository | BookRepository | books | - | count()", "mobile", "A repository BookRepository with count() int.", has)
+    expect(changed.length == 1 and changed[0]["path"] == "components/library/data/book_repository.nuc")
+
+  @test("an answer is held to the task's own words: quoted texts, calls and status codes")
+  faithful() void
+    bench = inject<Workbench>()
+    task = "A controller AuthorsController(books: BooksAppComponent) on the path \"authors\": GET \"{name}/books\" returns books.byAuthor(name) with status 201."
+    expect(bench.terms(task) == ["\"authors\"", "\"{name}/books\"", "books.byAuthor(name)", "201"])
+    code = "@controller('authors')\ncontroller AuthorsController(books: BooksAppComponent)\n  @get('{name}/books')\n  books(name: string) Result<Error, Book[]>\n    ~books.booksOf(name)\n"
+    expect(bench.missing(task, code) == ["books.byAuthor(name)", "201"])
+    // a signature the task writes is one of its words: a method is never renamed
+    expect(bench.missing("one GET request book(id: int) on the path \":id\"", "@get(path = ':id')\n  getOne(id: int) Result<BookError, Book>") == ["book(id: int)"])
+    expect(bench.missing("a GET all() that returns Result<BookError, Book[]>", "@get\n  getAll() Result<BookError, Book[]>") == ["all()"])
+
+  @test("a plan is shown as its parts, their tasks and their pieces, in the order the layers are written")
+  tree() void
+    planner = inject<Planner>()
+    pieces = [{ "kind": "usecase", "path": "components/books/domain/usecases/books_of_author.nuc" }, { "kind": "entity", "path": "components/books/data/entities/book.nuc" }, { "kind": "appcomponent", "path": "components/books/books_appcomponent.nuc" }, { "kind": "tests", "path": "test/books_test.nuc" }]
+    expect(planner.tree(pieces) == "books\n  data\n    - entity → components/books/data/entities/book.nuc\n  domain\n    - usecase → components/books/domain/usecases/books_of_author.nuc\n  facade\n    - appcomponent → components/books/books_appcomponent.nuc\ntests\n  tests\n    - tests → test/books_test.nuc")
+    expect(planner.layerOf("components/books/api/books_controller.nuc") == "api" and planner.partOf("config/project_config.nuc") == "app")
+
+  @test("without a project folder an agent reads no file")
+  noProject() void
+    bench = inject<Workbench>()
+    expect(bench.files("", "A use case BooksOfAuthor(books: BookRepository)") == "")
 
   @test("a failure is classified by rules, and each kind says what to do")
   classify() void

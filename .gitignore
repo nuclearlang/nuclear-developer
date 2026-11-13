@@ -2,3 +2,5 @@ build/
 __pycache__/
 .venv/
 data/
+.nuclear/chat/
+.nuclear/loop/

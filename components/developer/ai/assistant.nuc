@@ -1,17 +1,19 @@
-// The assistant: answers a message of the chat about the project, with the graph's knowledge, the project's map and
-// the last messages of the session. It explains and proposes Nuclear; it changes no file (an order to change the
+// The assistant: answers a message of the chat about the project or about NuclearLang, with the cards of the graph
+// closest to the question (every shelf: what it is, how it is done, what can and cannot be done), the project's map
+// and the last messages of the session. It explains and proposes Nuclear; it changes no file (an order to change the
 // project is a Loop run). Prompt: agents/chat.md.
 @state(PieceState)
 graph Assistant(bench: Workbench)
   @start
   @next("answer")
   recall(state: PieceState) <string, any>
-    found = ~bench.recall(state.task, state.platform, "chat")
-    { "guide": found.guide, "knowledge": found.knowledge, "examples": found.examples, "trace": state.trace + [bench.step("recall", "${found.knowledge.length} characters of knowledge")] }
+    cards = ~bench.lookup(state.task, state.platform)
+    { "guide": ~bench.knowledge.prompt("chat"), "knowledge": cards, "examples": "", "trace": state.trace + [bench.step("recall", "${cards.length} characters of knowledge")] }
 
   @next("end")
   answer(state: PieceState) <string, any>
-    prompt = ~bench.prompt("chat", { "guide": state.guide, "knowledge": state.knowledge, "examples": state.examples, "map": state.map, "history": state.history, "message": state.task, "platform": state.platform })
+    files = bench.files(state.root, state.task)
+    prompt = ~bench.prompt("chat", { "guide": state.guide, "knowledge": state.knowledge, "examples": state.examples, "map": state.map, "files": files, "history": state.history, "message": state.task, "platform": state.platform })
     report = ~bench.ask("default", prompt)
     // `context`: the characters the model read, so the editor shows how full its context window was
     { "code": "", "report": report.trim(), "check": "ok", "attempts": 1, "trace": state.trace + [bench.step("context", "${prompt.length}"), bench.step("answer", bench.firstLine(report))] }

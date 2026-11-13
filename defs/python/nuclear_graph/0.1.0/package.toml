@@ -3,9 +3,10 @@
 name = "nuclear_graph"
 version = "0.1.0"
 language = "python"
-description = "Nuclear Smart Graph: the graph client and the NuclearLang tools for agents"
+description = "Nuclear Smart Graph: the graph client, the NuclearLang tools and the project's files for agents"
 depends = ["python@3.14"]
 libraries = [
   "nuclear_graph.client",
   "nuclear_graph.toolchain",
+  "nuclear_graph.workspace",
 ]

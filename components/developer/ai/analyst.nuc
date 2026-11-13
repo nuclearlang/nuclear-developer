@@ -1,0 +1,196 @@
+// The analyst: before anything is generated or planned, says which kind of request a spec is and what the strategy
+// of that kind asks of the run (ADR-0105). Tools decide, in a fixed order: the project's files say which names of the
+// request the project has; the graph's strategy rows say which kind of request it is, by its exact signs first; the
+// strategy says which stages run, where the pieces come from and which facts it cannot start without. A model is
+// asked for one thing only, the resources a request in plain words describes, and the generator's dry run accepts or
+// refuses each. Prompt: agents/analyze.md.
+@state(PieceState)
+graph Analyst(bench: Workbench, toolchain: Toolchain)
+  @start
+  @next("classify")
+  read(state: PieceState) <string, any>
+    declared: <string, string> = {}
+    if state.root.length > 0
+      declared = Workspace(state.root).declarations()
+    existing: string[] = []
+    for name, file in declared
+      if file.length > 0 and Regex("\\b${name}\\b").test(state.task)
+        existing.add(name)
+    layout: <string, string> = ~toolchain.layout(state.platform)
+    spoken: <string, string> = ~bench.knowledge.kinds(state.platform)
+    fresh = named(state.task, layout, spoken).filter((n) => not (n in existing))
+    // a request that introduces a declaration with its kind's word ("an entity Loan", "a use case CancelOrder") is
+    // already designed in the platform's words: the planner splits it, and nothing is read from it in plain words
+    designed = named(state.task, layout, spoken, humps = false).length
+    detail = "of the project: ${existing.length > 0 ? existing.join(", ") : "nothing"}; new to it: ${fresh.length > 0 ? fresh.join(", ") : "nothing"}"
+    { "declared": declared, "existing": existing, "fresh": fresh, "designed": designed, "trace": state.trace + [bench.step("read", detail)] }
+
+  @next("derive")
+  classify(state: PieceState) <string, any>
+    chosen: <string, string> = ~bench.knowledge.strategy(state.task, state.platform, state.existing, state.fresh, true, state.forced)
+    limits: string[] = ~bench.knowledge.applies(state.task, state.platform)
+    if (chosen["lead"] ?? "") == "frontier"
+      limits.add(~bench.knowledge.brief("limit:agent-reasoning"))
+    why = chosen["why"] ?? ""
+    { "strategy": chosen, "limits": limits, "trace": state.trace + [bench.step("strategy", "${chosen["id"] ?? "none"} (${why.length > 0 ? why : "by meaning"})")] + limits.map((l) => bench.step("limit", l)) }
+
+  @next("end")
+  derive(state: PieceState) <string, any>
+    chosen = state.strategy
+    task = state.task
+    source = chosen["pieces"] ?? "plan"
+    generate: string[][] = []
+    pieces: <string, string>[] = []
+    questions: string[] = []
+    trace: <string, string>[] = state.trace
+    // the generators first: what a request in plain words asks to keep or read, each call tried before it is kept
+    // (only when the request lists fields: a model asked about a request that lists none invents them; and not when
+    // it introduces a declaration with its kind's word: that request is already designed, and the planner splits it)
+    wants = listed(task)
+    if "resource" in (chosen["generators"] ?? "").split(",") and source == "plan" and state.root.length > 0 and not explicit(task) and wants > 0 and state.designed == 0
+      calls = commands(~bench.ask("default", ~bench.prompt("analyze", { "task": task })), state.platform)
+      if calls.length == 1 and wants > 1 and fieldsOf(calls[0]) > 0 and fieldsOf(calls[0]) != wants
+        // held to the request's own list: asked once more with the number of fields it names, and left out when the
+        // second answer does not have them either (the fields are then asked to the user)
+        first = fieldsOf(calls[0])
+        calls = commands(~bench.ask("default", ~bench.prompt("analyze", { "task": "${task}\n\n(The request names ${wants} fields: write all ${wants}, and no other.)" })), state.platform).filter((c) => fieldsOf(c) == wants)
+        trace.add(bench.step("faithful", "the request lists ${wants} fields and the answer had ${first}: asked again, ${calls.length > 0 ? "now it has them" : "still not: left out"}"))
+      for args in calls
+        out: string = ~toolchain.dragonfly(state.root, ["gen"] + args + ["--dry-run"])
+        accepted = out.startsWith("exit 0")
+        if accepted
+          generate.add(args)
+        trace.add(bench.step("generator", "dragonfly gen ${args.join(" ")}: ${accepted ? "accepted" : bench.firstLine(out.split("\n").slice(1).join("\n").trim())}"))
+    // a rename is done by a tool: every file that writes the name, with the new one in its place
+    if source == "naming" and state.root.length > 0
+      names = renameOf(task, state.existing)
+      if names.length == 2
+        files = Workspace(state.root)
+        // with the names of the project built from it (`NewBook`, `BookRepository`): a repository is bound to its
+        // entity by its name
+        all: <string, string> = files.renames(names[0], names[1])
+        told: string[] = []
+        for before, after in all
+          told.add("`${before}` is now `${after}`")
+        changed: <string, string> = files.renamed(names[0], names[1])
+        for path, text in changed
+          pieces.add({ "path": path, "kind": "", "task": "${told.join(", ")}.", "code": text })
+        trace.add(bench.step("rename", "${told.join(", ")}: ${pieces.length} files"))
+    // a change of what exists starts in the files that declare it (an entity also in its `New<Name>` model)
+    if source == "declaring"
+      for name in state.existing
+        for one in [name, "New${name}"]
+          path = state.declared[one] ?? ""
+          if path.length > 0 and pieces.filter((p) => p["path"]! == path).length == 0
+            pieces.add({ "path": path, "kind": "", "task": task })
+    for line in (chosen["needs"] ?? "").split("\n")
+      cut = line.indexOf("=")
+      if cut > 0 and unmet(line.substring(0, cut), task, chosen["why"] ?? "", state.root.length > 0, generate.length, pieces.length, state.designed > 0)
+        questions.add(line.substring(cut + 1))
+    shown = generate.map((args) => "- dragonfly gen ${args.join(" ")}")
+    files = pieces.map((p) => "- ${p["path"]!}")
+    report = bench.sections(["${chosen["title"] ?? "No strategy"}\n\n${chosen["summary"] ?? ""}", shown.length > 0 ? "The generators write\n\n${shown.join("\n")}" : "", files.length > 0 ? "The files it changes\n\n${files.join("\n")}" : "", questions.length > 0 ? "The request does not say (ask the user)\n\n${questions.map((q) => "- ${q}").join("\n")}" : "", state.limits.length > 0 ? "Beyond the platform or the local agents (tell the user)\n\n${state.limits.map((l) => "- ${l}").join("\n")}" : ""])
+    { "generate": generate, "pieces": pieces, "questions": questions, "report": report, "trace": trace }
+
+  // The names a request introduces: the one after a kind's word ("a model Reader", "use case CancelOrder"; how people
+  // write each kind comes from the graph) and every name of two words or more (`CancelOrder`). A sentence's first
+  // word is not one.
+  // `humps = false`: only the ones after a kind's word.
+  named(task: string, layout: <string, string>, spoken: <string, string>, humps: boolean = true) string[]
+    said = task
+    for phrase, kind in spoken
+      if " " in phrase
+        said = said.replaceAll(Regex("\\b${phrase}\\b", ignoreCase = true), kind)
+    found: string[] = []
+    for m in Regex(r"\b([a-z]+)\s+([A-Z][A-Za-z0-9]*)").findAll(said)
+      name = m[2] ?? ""
+      if (m[1] ?? "") in layout and not (name in found)
+        found.add(name)
+    if humps
+      for m in Regex(r"\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b").findAll(task)
+        name = m[0] ?? ""
+        if not (name in found)
+          found.add(name)
+    found
+
+  // How many fields a request lists for a thing: the items of its first list after `has`, `with`, `con`, `tiene` or
+  // a colon ("a name, a phone and an email" is 3). 0: it lists none, and nobody may invent them.
+  listed(task: string) int
+    m = Regex(r"(?:\b(?:has|have|having|with|con|tiene|tienen)\b|:)\s*([^.;:\n]+)", ignoreCase = true).find(task)
+    if m == null
+      return 0
+    items = (m![1] ?? "").replaceAll(Regex(r"\b(?:and|y|e)\b"), ",").split(",").filter((i) => i.trim().length > 0)
+    items.length
+
+  // The fields of a generator call besides its key (0 for a call that takes them from an API's answer).
+  fieldsOf(args: string[]) int
+    at = args.indexOf("--fields")
+    if at < 0 or at + 1 >= args.length
+      return 0
+    args[at + 1].split(" ").filter((f) => f.length > 0 and not f.startsWith("id:")).length
+
+  // A request that already says its resources the way the Generate stage reads them: a `GET <url>` line or a
+  // Resources section.
+  explicit(task: string) boolean
+    Regex(r"^\s*GET\s+https?://\S+\s*$", multiLine = true).test(task) or "## Resources" in task
+
+  // The lines `component | Name | fields | source | actions` a model answered → the arguments of `dragonfly gen`
+  // for each (`resource orders Order --fields "..." --source db --actions list,create`). A line without a name, or
+  // with no field besides the key and no url, is left out: nothing is generated from a guess.
+  commands(raw: string, platform: string) string[][]
+    plain = Regex(r"^[a-z][a-z0-9_]*$")
+    pascal = Regex(r"^[A-Z][A-Za-z0-9]*$")
+    field = Regex(r"^[a-z][A-Za-z0-9]*:[A-Za-z][A-Za-z0-9]*\??$")
+    known = ["list", "get", "search", "create", "update", "delete"]
+    out: string[][] = []
+    for line in raw.split("\n")
+      cells = line.replaceAll("`", "").split("|").map((c) => c.trim())
+      if cells.length >= 5 and plain.test(cells[0]) and pascal.test(cells[1])
+        fields = cells[2].split(" ").filter((f) => field.test(f))
+        actions = cells[4].split(",").map((a) => a.trim()).filter((a) => a in known)
+        // a component is named in the plural: a model that repeats the name gets it corrected
+        component: string = cells[0]
+        if component == cells[1].lower()
+          component = component.endsWith("y") ? "${component.substring(0, component.length - 1)}ies" : component.endsWith("s") ? component : "${component}s"
+        args: string[] = ["resource", component, cells[1]]
+        if cells[3].startsWith("rest:http")
+          args = args + ["--from-json", cells[3].substring(5)]
+        else if fields.length > 1
+          args = args + ["--fields", fields.join(" "), "--source", "db"]
+        if args.length > 3
+          if actions.length > 0
+            args = args + ["--actions", actions.join(",")]
+          if platform != "backend"
+            args = args + ["--screen", component]
+          out.add(args)
+    out
+
+  // The two names of a rename: the declaration of the project the request names first, and the name it gets (the
+  // first one after it that follows `to`, `a`, `por`, an arrow or `called`). [] when one is missing.
+  renameOf(task: string, existing: string[]) string[]
+    olds = existing.filter((n) => n in task)
+    olds.sortBy((n) => task.indexOf(n))
+    if olds.length == 0
+      return []
+    rest = task.substring(task.indexOf(olds[0]) + olds[0].length)
+    for m in Regex(r"(?:\bto\b|\ba\b|\bpor\b|→|->|\bllamar(?:se)?\b|\bcalled\b|\bnamed\b)\s+`?([A-Za-z_][A-Za-z0-9_]*)`?").findAll(rest)
+      name = m[1] ?? ""
+      if name.length > 0 and not (name in existing)
+        return [olds[0], name]
+    []
+
+  // Whether the request lacks a fact its strategy cannot start without. `why`: the signs that chose the strategy;
+  // `inProject`: a project was read; `generated` and `tooled`: the generator calls and the pieces the tools gave;
+  // `designed`: the request introduces a declaration with its kind's word (its fields are in its own words).
+  unmet(need: string, task: string, why: string, inProject: boolean, generated: int, tooled: int, designed: boolean = false) boolean
+    if need == "url"
+      return not Regex(r"https?://").test(task) and not ("{" in task)
+    if need == "fields"
+      return inProject and generated == 0 and not designed and not explicit(task) and not Regex(r"\b[a-z][A-Za-z0-9]*:\s?[A-Za-z]").test(task) and not ("|" in task) and not ("{" in task)
+    if need == "names" or need == "declaration"
+      return inProject and tooled == 0
+    if need == "expected"
+      return not Regex(r"\b(should|must|expected|instead|deber[ií]a|debe|esperad[oa]|en vez|en lugar)\b", ignoreCase = true).test(task)
+    if need == "where"
+      return not ("it writes" in why)
+    false

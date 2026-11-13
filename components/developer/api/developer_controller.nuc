@@ -1,7 +1,7 @@
-// The local developer over HTTP (127.0.0.1:7879): POST /developer/code, /test, /security, /document, /chat, /diagnose and /plan. Each request
+// The local developer over HTTP (127.0.0.1:7879): POST /developer/code, /test, /security, /document, /chat, /diagnose, /analyze and /plan. Each request
 // runs on a thread of its own, so nothing of one request reaches the next.
 @controller("developer")
-controller DeveloperController(coder: Coder, tester: Tester, security: Security, documenter: Documenter, assistant: Assistant, diagnoser: Diagnoser, planner: Planner)
+controller DeveloperController(coder: Coder, tester: Tester, security: Security, documenter: Documenter, assistant: Assistant, diagnoser: Diagnoser, planner: Planner, analyst: Analyst)
   @post("code", status = 200)
   code(input: PieceRequest) PieceReply
     reply(~coder.run(start(input), thread = fresh()))
@@ -20,7 +20,7 @@ controller DeveloperController(coder: Coder, tester: Tester, security: Security,
 
   @post("chat", status = 200)
   chat(input: ChatRequest) PieceReply
-    state = { "task": input.message, "platform": input.platform, "map": input.map, "history": input.history }
+    state = { "task": input.message, "platform": input.platform, "map": input.map, "history": input.history, "root": input.root }
     reply(~assistant.run(state, thread = fresh()))
 
   // Why a step failed: `task` is the step, `context` its output, `path` the project's folder.
@@ -30,14 +30,22 @@ controller DeveloperController(coder: Coder, tester: Tester, security: Security,
 
   @post("plan", status = 200)
   plan(input: PlanRequest) PlanReply
-    state = ~planner.run({ "task": input.spec, "platform": input.platform }, thread = fresh())
-    PlanReply(pieces = state["pieces"]!, raw = state["report"]!, trace = state["trace"]!)
+    state = ~planner.run({ "task": input.spec, "platform": input.platform, "root": input.root }, thread = fresh())
+    PlanReply(pieces = state["pieces"]!, raw = state["report"]!, trace = state["trace"]!, tree = state["tree"]!, limits = state["limits"]!)
+
+  // Which kind of request a spec is and what its strategy asks of the run: before anything is generated or planned.
+  @post("analyze", status = 200)
+  analyze(input: AnalyzeRequest) Analysis
+    state = ~analyst.run({ "task": input.spec, "platform": input.platform, "root": input.root, "forced": input.strategy }, thread = fresh())
+    chosen: <string, string> = state["strategy"]!
+    stages = (chosen["stages"] ?? "").split(",").filter((s) => s.length > 0)
+    Analysis(strategy = chosen["id"] ?? "", title = chosen["title"] ?? "", why = chosen["why"] ?? "", mode = chosen["mode"] ?? "write", stages = stages, lead = chosen["lead"] ?? "local", source = chosen["pieces"] ?? "plan", generate = state["generate"]!, pieces = state["pieces"]!, questions = state["questions"]!, limits = state["limits"]!, report = state["report"]!, trace = state["trace"]!)
 
   fresh() string
     "${uuid4()}"
 
   start(input: PieceRequest) <string, any>
-    { "task": input.task, "platform": input.platform, "path": input.path, "kind": input.kind, "context": input.context }
+    { "task": input.task, "platform": input.platform, "path": input.path, "kind": input.kind, "context": input.context, "root": input.root }
 
   reply(state: <string, any>) PieceReply
     PieceReply(code = state["code"]!, report = state["report"]!, check = state["check"]!, attempts = state["attempts"]!, trace = state["trace"]!)

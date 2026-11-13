@@ -1,7 +1,8 @@
 # Nuclear Developer
 
 Local AI agents for [NuclearLang](https://github.com/nuclearlang/nuclear) and Dragonfly, on models of at most 3B
-parameters, as the junior developer of a frontier model: **coder**, **tester**, **security reviewer** and **planner**.
+parameters, as the junior developer of a frontier model: **coder**, **tester**, **security reviewer**, **planner**,
+**analyst**, **documenter**, **diagnoser** and **assistant**.
 What a small model cannot hold in its head comes from the [Nuclear Smart Graph](https://github.com/nuclearlang/nuclear-graph)
 (the ecosystem's private knowledge base); what it writes is checked by the Nuclear compiler before it answers.
 
@@ -16,10 +17,39 @@ A small model follows fixed steps better than it chooses tools, so each agent is
 ```
 recall ──► write ──► nuclear check ──ok──► answer
   │          ▲            │
-  │          └── repair ◄─┘ errors (at most 3 attempts)
-  └─ from the Smart Graph: the validated prompt of the use case, the closest knowledge
-     (specs, words of the dialect), solved examples (distilled from Claude) and example files
+  │          └── repair ◄─┘ errors (at most 3 attempts), each with the card of its code
+  └─ from the Smart Graph, for the kind it is about to write: the kind's own card, the mistakes
+     small models repeat with that kind, the closest rules, solved tasks and an example file
 ```
+
+Three more things happen by rule, never by the model's choice:
+
+- **It reads the project by itself.** A request may carry `root` (the project's folder): the coder then gets, as its
+  context, the files that declare the names its task writes (`Workspace.context`, read-only, never outside the
+  project), besides what the caller pasted. An order can be short: the path, the kind, every name.
+- **Its answer is held to the order's own words.** When the answer compiles, the quoted texts, the decorators with
+  their arguments, the calls (`books.byAuthor(name)`) and the status codes the task writes must be in it; what is
+  missing is asked for once more, without the examples (`agents/faithful.md`), and the first answer is kept when
+  the second is not better. (In round 19 it fired four times and changed no answer; it exists for the short orders
+  of a lead, where a renamed call breaks the next piece.)
+- **The plan says what is beyond the agents.** `POST /developer/plan` answers the pieces, the same plan as a tree
+  (`tree`: the big parts, one per component; the tasks of each, a layer; the pieces of each task, a file) and
+  `limits`: the rows of the graph's capabilities whose trigger words the spec writes ("authentication" on the
+  backend, "form" on the web), a spec longer than a local model reads at once, a plan without pieces or with too
+  many. How people write a kind ("application component", "use case") comes from the graph's cards of the kinds.
+- **The plan knows the project.** With the project's folder (`root`), a declaration the project already has and the
+  spec only uses (`repository: BookRepository`) is not planned again; one the spec introduces with its kind's word ("a
+  repository BookRepository with...") is planned as a change of its file; and new pieces go to the component of the
+  declarations the spec uses, whatever component the model names.
+
+The whole toolbox of an agent is one row of the graph, `service:agent-toolbox`: the graph, the compiler, the
+`dragonfly` commands, the project's files and the internet.
+
+What an agent reads is not a search over documents: the graph is a library of cards (ADR-0104). The coder asks for
+`kind:<platform>.<kind>` by its id, for the pitfalls whose `kinds` list has that kind, for solved tasks and an example
+file of that kind; a repair asks for `error:<code>` of each code the compiler named; the assistant searches every
+shelf with the question and gets each card with the rows it links to; the diagnoser gets the cards of the codes in a
+log and the closest known failures.
 
 | Agent | Model | Route | Does | Does not |
 |---|---|---|---|---|
@@ -31,17 +61,26 @@ recall ──► write ──► nuclear check ──ok──► answer
 | Diagnoser | `gemma4:e2b` | `POST /developer/diagnose` | when a pipeline stage fails: the kind of failure by fixed rules (transient, environment, code, test, spec), the evidence from the tools (`nuclear check`, `dragonfly doctor`) and the next step in plain words | change anything |
 | Planner | `gemma4:e2b` | `POST /developer/plan` | splits a spec into pieces of one file, in order; each path comes from the platform's layout (`nuclear help layout`), each kind and forgotten piece from the spec's own words | choose a folder, or plan what the spec does not name |
 
-Chat: `{message, platform, map, history}` → the same answer (`report`). Request (`code`, `test`, `security`, `document`: the journal in `context`): `{task, platform = "backend", path, kind, context}`; answer: `{code, report,
-check, attempts, trace: [{step, detail}]}`. Plan: `{spec, platform}` → `{pieces: [{path, kind, task}], raw, trace}`.
+Chat: `{message, platform, map, history, root}` → the same answer (`report`). Request (`code`, `test`, `security`,
+`document`: the journal in `context`): `{task, platform = "backend", path, kind, context, root}`; answer: `{code, report,
+check, attempts, trace: [{step, detail}]}`. Plan: `{spec, platform, root}` → `{pieces: [{path, kind, task}], raw, trace, tree,
+limits}`.
+Analysis (`POST /developer/analyze`, before a run generates or plans anything; ADR-0105): `{spec, platform, root,
+strategy}` → `{strategy, title, why, mode, stages, lead, source, generate, pieces, questions, limits, report, trace}`:
+which kind of request the spec is (a strategy row of the graph, chosen by the request's exact signs, then its meaning,
+and by which of its names the project has), the stages that run, the generator calls a request in plain words asks
+for (the one thing a model is asked: each line it answers is kept only if `dragonfly gen ... --dry-run` accepts it),
+the pieces the tools already gave (the files that declare what changes; every file of a rename, rewritten) and the
+facts the request lacks, as questions.
 Each request runs on a thread of its own. **The agents write only Nuclear**: they name a platform (`backend`, `mobile`,
-`web`), never a dialect, read the graph's `nuclear` collection (no target-language code) and check with
+`web`), never a dialect, read only the graph's rows for agents (`agents`: no target-language code) and check with
 `nuclear check --platform` (ADR-0102 §11).
 
 The sources: `components/developer/ai/` (`workbench.nuc` — what every agent shares —, `coder.nuc`, `tester.nuc`,
-`security.nuc`, `documenter.nuc`, `assistant.nuc`, `diagnoser.nuc`, `planner.nuc`, `states/piece_state.nuc`), `components/developer/domain/models/`,
+`security.nuc`, `documenter.nuc`, `assistant.nuc`, `diagnoser.nuc`, `planner.nuc`, `analyst.nuc`, `states/piece_state.nuc`), `components/developer/domain/models/`,
 `components/developer/api/developer_controller.nuc`, `config/project_config.nuc` (the two Ollama models),
 `config.nuc` (`dependencies(nuclear_graph = "../nuclear-graph")`), `defs/` (the type definitions of
-`nuclear_graph.client` and `nuclear_graph.toolchain`, generated with `tools/defs/python/gen.py`).
+`nuclear_graph.client`, `nuclear_graph.toolchain` and `nuclear_graph.workspace`, generated with `tools/defs/python/gen.py`).
 
 **The prompts are files**, never strings in the code: every prompt a model reads is
 `nuclear-graph/src/nuclear_graph/prompts/agents/<step>.md` (`{{name}}` filled by `Workbench.prompt`, an empty `## `
@@ -49,14 +88,39 @@ section dropped; the list is that folder's README), over the use-case guides `pr
 
 ## Run it
 
+The set-up of the AI services installs it, with the Smart Graph and the models that fit the machine, and starts it at
+every login ([Set up the AI services](https://github.com/nuclearlang/nuclear/blob/main/docs/ai/setup.md)):
+
+```sh
+nuclear-loop setup            # or the installer's last step, or VS Code: Nuclear: Set Up the AI Services
+nuclear-loop setup --status   # what is installed and running
+```
+
+By hand, in this folder (what the set-up does):
+
 ```sh
 ollama pull qwen2.5-coder:3b && ollama pull gemma4:e2b
 nuclear-graph serve &                                   # the Smart Graph (see its README)
 nuclear-graph connect nuclear-developer --scopes read,write
-dragonfly build && dragonfly install                    # build/ from the .nuc files
+dragonfly install                                       # build/ from the .nuc files, and its environment
 cd build && .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 7879
-# or, from the nuclear working tree: ./install.sh --ai, then `nuclear-developer` (NUCLEAR_DEVELOPER_PORT)
 ```
+
+### The models: a profile for the machine
+
+| Profile | Models | Downloads | Memory | Measured with the Developer's evaluation |
+|---|---|---|---|---|
+| `lite` | `qwen2.5-coder:1.5b` | 1.6 GB | 8 GB (4 GB at least) | not measured yet |
+| `medium` | `qwen2.5-coder:3b` | 2.5 GB | 12 GB (8 GB at least) | as coder, the model of hard: 43 of 45 single-file tasks, 16 of 18 never seen; as assistant, 6 of the first 8 chat questions (hard: 10 of 10) |
+| `hard` | `qwen2.5-coder:3b` + `gemma4:e2b` | 9.7 GB | 24 GB (16 GB at least) | 43 of 45 single-file tasks (Claude Sonnet: 39), 16 of 18 never seen, 2 of 3 whole features, 10 of 10 chat questions, 10 of 11 analyses |
+| `remote` | none | nothing but the MCP server (33 MB) | any | nothing runs on the machine |
+
+Every local profile also downloads `embeddinggemma` (0.6 GB, counted above), which makes the graph's vectors. No model is larger than 3B parameters of effective size.
+
+The set-up suggests the heaviest profile that runs well with the machine's memory; the choice is the user's, and a
+profile's models are the defaults of `CODER_MODEL` and `ASSISTANT_MODEL` on that machine. How each was measured:
+`eval/run.py chat`, `analyze` and `local` against a Developer started with those models. `lite`, and `medium` as
+assistant beyond 8 chat questions, are not measured yet.
 
 ```sh
 curl -s -X POST 127.0.0.1:7879/developer/code -H 'content-type: application/json' \
@@ -64,16 +128,21 @@ curl -s -X POST 127.0.0.1:7879/developer/code -H 'content-type: application/json
        "path": "components/tasks/domain/models/task_models.nuc", "kind": "model"}'
 ```
 
-Models: `CODER_MODEL`, `ASSISTANT_MODEL`, `OLLAMA_URL` (the editor's *Settings and integrations* page starts it with
-the models chosen there). Each model runs with a context window of 8192 tokens (`numCtx` in
-`config/project_config.nuc`; the editor's `nuclear.ai.contextTokens` says the same for its chat meter).
+Models: `CODER_MODEL`, `ASSISTANT_MODEL`, `OLLAMA_URL`. The set-up writes the ones of the chosen profile in
+`~/.config/nuclearlang/ai.env`, and the `nuclear-developer` command starts with them unless its caller gives others
+(the editor's *Settings and integrations* page does, with the models chosen there). Each model runs with a context window of `CONTEXT_TOKENS` (8192 by default; the editor
+passes its `nuclear.ai.contextTokens`).
 
 ## What it knows
 
-The knowledge base of the whole project is [`data/`](data/README.md): its own repository (`nuclear-knowledge`), every
-document, example and tool help of the working tree copied byte for byte and ordered step by step (`data/INDEX.md`).
-The Smart Graph ingests it; the agents read every section but the ones about the target languages and the dialects
-underneath. Rebuild it after a change: `nuclear-graph knowledge build`, then `nuclear-graph ingest data`.
+The knowledge base of the whole project is [`data/`](data/README.md): its own repository (`nuclear-knowledge`), rows
+on nine shelves: what NuclearLang is for, how each thing is written, every kind and decorator, every tool (the four
+CLIs, the MCP tools, the generators), every diagnostic and failure with its fix, what can and cannot be done, how
+each task is done step by step, and validated code. Most rows are generated from the working tree; the rest are
+written by hand and reviewed when their sources change. The Smart Graph ingests it; the agents read every row but
+the ones about the target languages and the dialects underneath (`agents: false`). After a change:
+`nuclear-graph knowledge build`, `knowledge check`, then `nuclear-graph ingest`; `nuclear-graph knowledge ask` asks
+the graph the questions people ask.
 
 ## Where it works
 
@@ -100,8 +169,8 @@ ledger of the files it writes; an orphaned run is recovered (its unfinished step
 step. A call to the Developer nothing works on (the Developer silent, Ollama holding no model) is cut and retried, and
 every run first checks that the Developer, the graph, Ollama and the models it needs answer.
 
-**What the agents may read.** Only Nuclear and the platform (`backend`, `mobile`, `web`): the graph's `nuclear`
-collection has no target-language code, a failing test reaches them told in `.nuc` terms, a piece's errors are given by
+**What the agents may read.** Only Nuclear and the platform (`backend`, `mobile`, `web`): a row the agents read
+has no target-language code (the build of the knowledge base refuses one that has), a failing test reaches them told in `.nuc` terms, a piece's errors are given by
 line, and the diagnoser's prompt forbids speaking of the generated code.
 
 ## Evaluation: how it was trained
@@ -141,10 +210,17 @@ From round 4 the bank has 45 tasks (18 held out):
 | 15 | the tester: only the plan's names, nothing to inject for models, a search without `inject`; errors by line | **38 / 39**, 1 of 3 features | **15 / 17** |
 | 16 | void: stopped at 10 minutes while another agent held Ollama | — | — |
 | 17 | the words of the kinds in Nuclear only (`[underneath]` for the framework), the compiler gaps fixed | 37 / 39, 1 of 3 features | 14 / 17 (`entity-reader`: the decorator written after its field, not repaired) |
+| 18 | the graph as a library (ADR-0104): the coder reads the card of its kind, the pitfalls of that kind and examples; a repair reads the card of each error code; both quote styles score as the same string | 39 / 39, 1 of 3 features | 16 / 17 |
+| 19 | the planner reads how people write a kind from the graph ("application component"); the coder holds its answer to the task's words | **40 / 39**, 2 of 3 features | **16 / 17** |
+| 20–21 | measured and discarded: the coder's guide without its general rules and shapes (only the kind's own rules, from the graph): it gained the state model and a graph and lost `replaceAll`, a renamed method and a service's shape | 39 / 39, 1 of 3 features | 14 / 17 |
+| 22 | the general rules stay in the guide and every rule of the kind comes from the graph (the two closest whole, the rest in a line); examples of the same kind only; the answer held also to the signatures the task writes | **43 / 39**: every task of one file passes (42 of 42), 1 of 3 features | **16 / 17** |
+| 23 | the answer held also to the signatures without parameters (`all()`) | **43 / 39**, 2 of 3 features | 16 / 17 |
 
-On single files the local 3B coder is at Sonnet's level (36 of 42 against 36). On features it is behind: after round
-11 it passes one of the three by itself (planned, written piece by piece and compiled as a project), where Sonnet
-passes all three; the others miss an application component the planner does not recognise and a repository detail.
+On single files the local 3B coder passes every task of the bank in round 22 and all but one in round 23 (42 and
+41 of 42; Sonnet 36). On features of
+several files written by the local agents alone it passes one or two of the three, depending on the round, where
+Sonnet passes all three: a piece renames a method the spec writes, or two pieces declare the same thing. That is why
+a feature goes through the generators first and, when it has a design of its own, under a lead.
 Measured and discarded: giving the coder the file `dragonfly make` writes (29 of 42 against 37). Each local answer takes 1.5–10 s on the CPU, a feature 1–1.5 min. The full table,
 task by task, is `eval/results/REPORT.md`.
 
@@ -156,17 +232,26 @@ cd eval
 ../../nuclear-graph/.venv/bin/python run.py report
 ```
 
+**The analyst** (ADR-0105) is measured apart: `run.py analyze` gives eleven requests, as a user writes them in English
+and Spanish, to `/developer/analyze` in a fresh project (`[[analysis]]` in `tasks.toml`) and checks the strategy each
+gets, the `dragonfly gen` call a request in plain words becomes, the pieces the tools give, the questions it asks and
+the stages that run. First measure: **10 of 11**, 4 of the 5 that ask the model (the one that fails drops a field
+twice, and then asks the user for the fields instead of generating). Which strategy a request gets asks no model: it
+is tested with the knowledge base (`nuclear-graph knowledge ask`: 62 requests, all to their strategy).
+
 ## Known limits
+
+The agents know their own limits: they are rows of the graph (`limit:agent-one-file`, `limit:agent-context`,
+`limit:agent-reasoning`, `limit:agent-features`, `limit:agent-nuclear-only`, `limit:agent-internet`) with the
+procedure to follow when a task is beyond them (`playbook:escalate`).
 
 - The 3B tester copies a solved example of the graph when it is close to the task (a spec that declares only a model
   got a test of an application component from the examples): the run now fails at *Tests first* with the diagnosis
   instead of passing without tests; Claude-led runs fix it.
 - The planner maps a kind only from its own word ("application component" is not `appcomponent`) and names a
   component after the first model of a plain spec (`newbooks`).
-- The words of the kinds (`docs.toml`) name the framework in prose ("pydantic models"): the `nuclear` collection
-  removes code, not prose.
-- The context window is fixed at 8192 in `config/project_config.nuc` (reading it from the environment needs the
-  compiler to know the return types of the type definitions' functions: Pending in STATUS).
+- A value that comes from a library method has no known type: declare it (`card: string = ~knowledge.card(...)`)
+  before using a member of the standard library on it.
 
 ## Development
 

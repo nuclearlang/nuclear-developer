@@ -7,6 +7,8 @@ PieceRequest
   path: string = ""
   kind: string = ""
   context: string = ""
+  // the project's folder: with it an agent reads by itself the files that declare the names its task writes
+  root: string = ""
 
 // What an agent answers: the code (or the review), its check and what it did, step by step.
 PieceReply
@@ -22,11 +24,47 @@ PlanRequest
   spec: string
   // backend, mobile or web: the agents write Nuclear for a platform, never for a dialect
   platform: string = "backend"
+  // the project's folder: what it already declares is not planned again, and new pieces go to its components
+  root: string = ""
 
-// The pieces of a plan, in the order they can be written.
+// The pieces of a plan, in the order they can be written; the same plan as a tree (the big parts, their tasks, the
+// pieces of each); and what of the spec is beyond the platform or the local agents, for the user to know.
 PlanReply
   pieces: <string, string>[]
   raw: string
+  trace: <string, string>[]
+  tree: string = ""
+  limits: string[] = []
+
+// A request to analyse before a run: which kind of request it is.
+AnalyzeRequest
+  @minLength(3)
+  spec: string
+  platform: string = "backend"
+  // the project's folder: with it the analyst knows which names of the request the project has
+  root: string = ""
+  // the strategy the request itself names (`usecase`), when it names one
+  strategy: string = ""
+
+// The strategy of a request (ADR-0105) and what it asks of the run: the stages that run, the generator calls (the
+// arguments of `dragonfly gen`, each accepted by its dry run), the pieces the tools already gave (a piece with `code`
+// is written as it is) and the facts the request lacks.
+Analysis
+  strategy: string
+  title: string
+  why: string
+  // write, repair, verify, review, answer, commands or lead
+  mode: string
+  stages: string[]
+  // local, or frontier when the strategy needs a model that understands several files at once
+  lead: string
+  // where the pieces come from: plan (the planner splits what is left), declaring, naming or none
+  source: string
+  generate: string[][]
+  pieces: <string, string>[]
+  questions: string[]
+  limits: string[]
+  report: string
   trace: <string, string>[]
 
 // What the Nuclear Smart Graph gave an agent for a task.
@@ -46,3 +84,5 @@ ChatRequest
   map: string = ""
   // the last messages of the session, oldest first, as `you: ...` / `agent: ...` lines
   history: string = ""
+  // the project's folder: with it the assistant reads the files that declare the names the question writes
+  root: string = ""

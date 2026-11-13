@@ -6,8 +6,7 @@ graph Documenter(bench: Workbench)
   @start
   @next("write")
   recall(state: PieceState) <string, any>
-    found = ~bench.recall("documentation ${state.task}", state.platform, "docs")
-    { "guide": found.guide, "trace": state.trace + [bench.step("recall", "docs guide")] }
+    { "guide": ~bench.knowledge.prompt("docs"), "trace": state.trace + [bench.step("recall", "docs guide")] }
 
   @next("end")
   write(state: PieceState) <string, any>

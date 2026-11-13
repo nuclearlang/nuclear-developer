@@ -12,11 +12,13 @@ graph Diagnoser(bench: Workbench, toolchain: Toolchain)
       evidence = ~toolchain.checkProject(state.path)
     else if kind == "environment" and state.path.length > 0
       evidence = ~toolchain.dragonfly(state.path, ["doctor"], timeout = 120)
-    { "failure": kind, "knowledge": evidence, "trace": state.trace + [bench.step("classify", "${kind}: ${actionOf(kind)}")] }
+    // what the graph knows of it: the card of each diagnostic the output names, and the closest known failures
+    known = bench.sections([~bench.explain(state.context), ~bench.failures(tail(state.context, 600), state.platform)])
+    { "failure": kind, "knowledge": evidence, "examples": known, "trace": state.trace + [bench.step("classify", "${kind}: ${actionOf(kind)}")] }
 
   @next("end")
   explain(state: PieceState) <string, any>
-    prompt = ~bench.prompt("diagnose", { "kind": state.failure, "action": actionOf(state.failure), "step": state.task, "failure": tail(state.context, 6000), "evidence": tail(state.knowledge, 4000) })
+    prompt = ~bench.prompt("diagnose", { "kind": state.failure, "action": actionOf(state.failure), "step": state.task, "failure": tail(state.context, 6000), "evidence": tail(state.knowledge, 4000), "known": state.examples })
     text = ~bench.ask("default", prompt)
     report = "kind: ${state.failure}\naction: ${actionOf(state.failure)}\n\n${text.trim()}"
     { "code": "", "report": report, "check": "ok", "attempts": 1, "trace": state.trace + [bench.step("explain", bench.firstLine(text))] }

@@ -5,7 +5,7 @@ graph Tester(bench: Workbench)
   @start
   @next("write")
   recall(state: PieceState) <string, any>
-    found = ~bench.recall("tests @test expect ${state.task}", state.platform, "test")
+    found = ~bench.recall("tests @test expect ${state.task}", state.platform, "test", kind = "tests")
     guide = ~bench.prompt("test", { "guide": found.guide })
     { "guide": guide, "knowledge": found.knowledge, "examples": found.examples, "kind": "tests", "trace": state.trace + [bench.step("recall", "test guide and examples")] }
 

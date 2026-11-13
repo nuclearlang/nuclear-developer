@@ -1,6 +1,123 @@
 {
   "components": {
     "schemas": {
+      "Analysis": {
+        "description": "The strategy of a request (ADR-0105) and what it asks of the run: the stages that run, the generator calls (the arguments of `dragonfly gen`, each accepted by its dry run), the pieces the tools already gave (a piece with `code` is written as it is) and the facts the request lacks.",
+        "properties": {
+          "generate": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "lead": {
+            "description": "local, or frontier when the strategy needs a model that understands several files at once",
+            "type": "string"
+          },
+          "limits": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "mode": {
+            "description": "write, repair, verify, review, answer, commands or lead",
+            "type": "string"
+          },
+          "pieces": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "report": {
+            "type": "string"
+          },
+          "source": {
+            "description": "where the pieces come from: plan (the planner splits what is left), declaring, naming or none",
+            "type": "string"
+          },
+          "stages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "strategy": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "trace": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "why": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "strategy",
+          "title",
+          "why",
+          "mode",
+          "stages",
+          "lead",
+          "source",
+          "generate",
+          "pieces",
+          "questions",
+          "limits",
+          "report",
+          "trace"
+        ],
+        "type": "object"
+      },
+      "AnalyzeRequest": {
+        "description": "A request to analyse before a run: which kind of request it is.",
+        "properties": {
+          "platform": {
+            "default": "backend",
+            "type": "string"
+          },
+          "root": {
+            "default": "",
+            "description": "the project's folder: with it the analyst knows which names of the request the project has",
+            "type": "string"
+          },
+          "spec": {
+            "minLength": 3,
+            "type": "string"
+          },
+          "strategy": {
+            "default": "",
+            "description": "the strategy the request itself names (`usecase`), when it names one",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "type": "object"
+      },
       "ChatRequest": {
         "description": "A message to the local assistant, with what it needs to answer about the project.",
         "properties": {
@@ -21,6 +138,11 @@
           "platform": {
             "default": "backend",
             "description": "backend, mobile or web",
+            "type": "string"
+          },
+          "root": {
+            "default": "",
+            "description": "the project's folder: with it the assistant reads the files that declare the names the question writes",
             "type": "string"
           }
         },
@@ -97,6 +219,11 @@
             "description": "backend, mobile or web: the agents write Nuclear for a platform, never for a dialect",
             "type": "string"
           },
+          "root": {
+            "default": "",
+            "description": "the project's folder: with it an agent reads by itself the files that declare the names its task writes",
+            "type": "string"
+          },
           "task": {
             "minLength": 3,
             "type": "string"
@@ -108,8 +235,14 @@
         "type": "object"
       },
       "PlanReply": {
-        "description": "The pieces of a plan, in the order they can be written.",
+        "description": "The pieces of a plan, in the order they can be written; the same plan as a tree (the big parts, their tasks, the pieces of each); and what of the spec is beyond the platform or the local agents, for the user to know.",
         "properties": {
+          "limits": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "pieces": {
             "items": {
               "additionalProperties": {
@@ -130,12 +263,17 @@
               "type": "object"
             },
             "type": "array"
+          },
+          "tree": {
+            "default": "",
+            "type": "string"
           }
         },
         "required": [
           "pieces",
           "raw",
-          "trace"
+          "trace",
+          "limits"
         ],
         "type": "object"
       },
@@ -145,6 +283,11 @@
           "platform": {
             "default": "backend",
             "description": "backend, mobile or web: the agents write Nuclear for a platform, never for a dialect",
+            "type": "string"
+          },
+          "root": {
+            "default": "",
+            "description": "the project's folder: what it already declares is not planned again, and new pieces go to its components",
             "type": "string"
           },
           "spec": {
@@ -189,6 +332,48 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/developer/analyze": {
+      "post": {
+        "operationId": "DeveloperController.analyze",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Analysis"
+                }
+              }
+            },
+            "description": "ok"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "the error of the use case"
+          }
+        },
+        "summary": "Which kind of request a spec is and what its strategy asks of the run: before anything is generated or planned.",
+        "tags": [
+          "developer"
+        ]
+      }
+    },
     "/developer/chat": {
       "post": {
         "operationId": "DeveloperController.chat",

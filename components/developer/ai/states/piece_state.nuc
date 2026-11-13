@@ -5,6 +5,8 @@ PieceState
   path: string
   kind: string
   context: string
+  // the project's folder ("" when the caller gave none)
+  root: string
   // the chat: the project's map and the last messages of the session
   map: string
   history: string
@@ -18,4 +20,19 @@ PieceState
   check: string
   attempts: int
   pieces: <string, string>[]
+  // the planner: the plan as a tree, and what of the spec is beyond the platform or the local agents
+  tree: string
+  limits: string[]
+  // the analyst: the project's declarations (name → file), the ones the request names, the names new to the project,
+  // the strategy the request itself asks for, the strategy the graph gave (its fields as texts), the generator calls
+  // (the arguments of `dragonfly gen`) and the questions for the user
+  declared: <string, string> = {}
+  existing: string[]
+  fresh: string[]
+  // how many declarations the request introduces with their kind's word (a request already designed)
+  designed: int
+  forced: string
+  strategy: <string, string> = {}
+  generate: string[][]
+  questions: string[]
   trace: <string, string>[]

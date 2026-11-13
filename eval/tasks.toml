@@ -495,3 +495,78 @@ platform = "mobile"
 dialect = "flutter"
 spec = "The books list of the mobile app, component books. A model Book (id: int, title: string). A model BookError (message: string). A repository BookRepository over the API's \"books\" path with a GET all() that returns Result<BookError, Book[]>. A use case AllBooksUseCase(books: BookRepository) whose exec() returns ~books.all(). An application component BooksComponent with all() = AllBooksUseCase.exec."
 must = ["Book", "BookError", "@repository(path = \"books\")", "repository BookRepository", "all() Result<BookError, Book[]>", "usecase AllBooksUseCase", "appcomponent BooksComponent", "all() = AllBooksUseCase.exec"]
+
+# ---- the analyst (ADR-0105): `run.py analyze` ----
+# A request as a user writes it, given to `/developer/analyze` in a fresh backend project that has an `orders Order`
+# resource. `strategy`: the one it must get. `generate`: the `dragonfly gen resource` call a request in plain words
+# must become (`fields`: the names it must have besides the key, `count` of them when the request names more;
+# `actions`: the ones it must have at least); `[]`-less tables with no `generate` expect no call. `asks`: it must ask
+# for a fact. `pieces`: the files it must give; `tooled`: each already written by a tool. `skips`: stages that do not
+# run. Only the `generate` cases ask a model.
+
+[[analysis]]
+id = "analysis-suppliers"
+request = "Keep the suppliers of the shop: each one has a name and a phone. We add them, list them and change them."
+strategy = "resource-db"
+generate = { component = "suppliers", name = "Supplier", fields = ["name", "phone"], source = "db", actions = ["create", "list", "update"] }
+
+[[analysis]]
+id = "analysis-invoices"
+request = "An invoice has a number, a total and a paid flag. We create invoices and mark them as paid."
+strategy = "resource-db"
+generate = { component = "invoices", name = "Invoice", fields = ["number", "total", "paid"], source = "db", actions = ["create", "update"] }
+
+[[analysis]]
+id = "analysis-mascotas"
+request = "Registrar las mascotas de la clínica con su nombre, especie y edad; listarlas y borrarlas."
+strategy = "resource-db"
+generate = { component = "pets", name = "Pet", fields = ["name", "species", "age"], source = "db", actions = ["list", "delete"] }
+
+[[analysis]]
+id = "analysis-productos"
+request = "Necesito llevar los productos: nombre, precio y cantidad en inventario. Poder crearlos y consultarlos todos."
+strategy = "resource-db"
+generate = { component = "products", name = "Product", fields = ["name", "price"], count = 3, source = "db", actions = ["create", "list"] }
+
+[[analysis]]
+id = "analysis-locations"
+request = "List the locations of https://rickandmortyapi.com/api/location and show one location by its id."
+strategy = "resource-api"
+generate = { component = "locations", name = "Location", source = "rest", actions = ["list", "get"] }
+
+[[analysis]]
+id = "analysis-no-fields"
+request = "un CRUD de facturas"
+strategy = "resource-db"
+asks = true
+
+[[analysis]]
+id = "analysis-rename"
+request = "rename Order to Purchase"
+strategy = "refactor-rename"
+pieces = ["data/entities/order.nuc", "data/repositories/order_repository.nuc"]
+tooled = true
+skips = ["generate", "test"]
+
+[[analysis]]
+id = "analysis-field"
+request = "agrega el campo nota de tipo string a Order"
+strategy = "member"
+pieces = ["data/entities/order.nuc", "domain/models/new_order.nuc"]
+
+[[analysis]]
+id = "analysis-usecase"
+request = "A use case CancelOrder(repository: OrderRepository): an order is cancelled only when its status is pending. POST orders/{id}/cancel answers it."
+strategy = "usecase"
+
+[[analysis]]
+id = "analysis-compile-error"
+request = "error[N0114]: 'Order' has no member 'totl' in components/orders/domain/usecases/update_order.nuc"
+strategy = "bug-compile"
+skips = ["generate", "plan", "test"]
+
+[[analysis]]
+id = "analysis-behaviour"
+request = "al borrar un pedido que no existe debería responder 404 pero responde 200"
+strategy = "bug-behaviour"
+skips = ["generate"]

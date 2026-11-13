@@ -1,0 +1,131 @@
+{
+  "analysis-suppliers": {
+    "pass": true,
+    "wrong": [],
+    "strategy": "strategy:resource-db",
+    "generate": [
+      [
+        "resource",
+        "suppliers",
+        "Supplier",
+        "--fields",
+        "name:string phone:string",
+        "--source",
+        "db",
+        "--actions",
+        "list,create,update"
+      ]
+    ],
+    "seconds": 18.3
+  },
+  "analysis-invoices": {
+    "pass": false,
+    "wrong": [
+      "the call is for  ",
+      "fields []",
+      "source none",
+      "actions none",
+      "it asks: Which fields does it have, and of which type? Give a `Key | Type` table, an example answer, the API's url or `name:type` pairs."
+    ],
+    "strategy": "strategy:resource-db",
+    "generate": [],
+    "seconds": 40.6
+  },
+  "analysis-mascotas": {
+    "pass": true,
+    "wrong": [],
+    "strategy": "strategy:resource-db",
+    "generate": [
+      [
+        "resource",
+        "pets",
+        "Pet",
+        "--fields",
+        "id:int name:string species:string age:int",
+        "--source",
+        "db",
+        "--actions",
+        "create,list,delete"
+      ]
+    ],
+    "seconds": 21.5
+  },
+  "analysis-productos": {
+    "pass": true,
+    "wrong": [],
+    "strategy": "strategy:resource-db",
+    "generate": [
+      [
+        "resource",
+        "products",
+        "Product",
+        "--fields",
+        "name:string price:double quantity:int",
+        "--source",
+        "db",
+        "--actions",
+        "create,list"
+      ]
+    ],
+    "seconds": 29.0
+  },
+  "analysis-locations": {
+    "pass": true,
+    "wrong": [],
+    "strategy": "strategy:resource-api",
+    "generate": [
+      [
+        "resource",
+        "locations",
+        "Location",
+        "--from-json",
+        "https://rickandmortyapi.com/api/location",
+        "--actions",
+        "list,get"
+      ]
+    ],
+    "seconds": 23.1
+  },
+  "analysis-no-fields": {
+    "pass": true,
+    "wrong": [],
+    "strategy": "strategy:resource-db",
+    "generate": [],
+    "seconds": 0.4
+  },
+  "analysis-rename": {
+    "pass": true,
+    "wrong": [],
+    "strategy": "strategy:refactor-rename",
+    "generate": [],
+    "seconds": 0.2
+  },
+  "analysis-field": {
+    "pass": true,
+    "wrong": [],
+    "strategy": "strategy:member",
+    "generate": [],
+    "seconds": 0.2
+  },
+  "analysis-usecase": {
+    "pass": true,
+    "wrong": [],
+    "strategy": "strategy:usecase",
+    "generate": [],
+    "seconds": 0.2
+  },
+  "analysis-compile-error": {
+    "pass": true,
+    "wrong": [],
+    "strategy": "strategy:bug-compile",
+    "generate": [],
+    "seconds": 0.3
+  },
+  "analysis-behaviour": {
+    "pass": true,
+    "wrong": [],
+    "strategy": "strategy:bug-behaviour",
+    "generate": [],
+    "seconds": 0.2
+  }
+}

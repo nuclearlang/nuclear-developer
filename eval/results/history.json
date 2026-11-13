@@ -328,5 +328,137 @@
     },
     "cost_usd": 0.89,
     "local_seconds": 337.5
+  },
+  "18": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 23,
+      "equivalent": 20
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 15,
+      "equivalent": 15
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 38,
+      "equivalent": 35
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 348.5
+  },
+  "19": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 24,
+      "equivalent": 21
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 16,
+      "equivalent": 15
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 40,
+      "equivalent": 36
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 397.5
+  },
+  "20": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 25,
+      "equivalent": 22
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 14,
+      "equivalent": 13
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 39,
+      "equivalent": 35
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 340.7
+  },
+  "21": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 25,
+      "equivalent": 22
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 14,
+      "equivalent": 13
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 39,
+      "equivalent": 35
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 435.6
+  },
+  "22": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 27,
+      "equivalent": 22
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 16,
+      "equivalent": 15
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 43,
+      "equivalent": 37
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 353.8
+  },
+  "23": {
+    "train": {
+      "tasks": 27,
+      "sonnet": 22,
+      "local": 27,
+      "equivalent": 22
+    },
+    "test": {
+      "tasks": 18,
+      "sonnet": 17,
+      "local": 16,
+      "equivalent": 15
+    },
+    "all": {
+      "tasks": 45,
+      "sonnet": 39,
+      "local": 43,
+      "equivalent": 37
+    },
+    "cost_usd": 0.89,
+    "local_seconds": 348.8
   }
 }

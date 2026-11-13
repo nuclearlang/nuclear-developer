@@ -4,6 +4,7 @@
     ../../nuclear-graph/.venv/bin/python run.py reference   # Sonnet answers every task once (paid, cached)
     ../../nuclear-graph/.venv/bin/python run.py distill     # the validated train answers become graph examples
     ../../nuclear-graph/.venv/bin/python run.py local       # the local developer answers every task
+    ../../nuclear-graph/.venv/bin/python run.py analyze     # the analyst: the strategy and the generator calls of each request
     ../../nuclear-graph/.venv/bin/python run.py report      # results/REPORT.md
 
 `[[feature]]` entries are several files: Sonnet writes them all in one answer; the local developer plans them
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import subprocess
 import sys
@@ -29,13 +31,11 @@ from pathlib import Path
 
 import httpx
 
-from nuclear_graph import secrets_store
-from nuclear_graph.paths import URL as GRAPH_URL
 from nuclear_graph.toolchain import Toolchain, strip_fences
 
 HERE = Path(__file__).parent
 RESULTS = HERE / "results"
-DEVELOPER = "http://127.0.0.1:7879"
+DEVELOPER = os.environ.get("NUCLEAR_DEVELOPER_URL", "http://127.0.0.1:7879")
 BUDGET_USD = 18.0  # the user approved up to USD 20 for the references
 REFERENCE_MODEL = "sonnet"
 tools = Toolchain()
@@ -102,7 +102,8 @@ def context_of(task: dict, snippets: dict[str, str]) -> str:
 
 
 def score(task: dict, code: str, check: str) -> dict:
-    missing = [m for m in task["must"] if m not in code]
+    same = code.replace("'", '"')  # both quotes write the same string in Nuclear
+    missing = [m for m in task["must"] if m not in code and m.replace("'", '"') not in same]
     return {"check": check, "missing": missing, "pass": check == "ok" and not missing}
 
 
@@ -188,33 +189,11 @@ async def reference_features() -> None:
 
 
 async def distill() -> None:
-    """Every validated train answer is an example in the graph: the task, then the code."""
-    all_tasks, _ = tasks()
-    refs = load("reference")
-    headers = {"Authorization": f"Bearer {secrets_store.owner_token()}"}
-    n = 0
-    async with httpx.AsyncClient(base_url=GRAPH_URL, timeout=120, headers=headers) as http:
-        for t in all_tasks + features():
-            r = refs.get(t["id"])
-            if t["split"] != "train" or not r or not r["pass"]:
-                continue
-            if "spec" in t:  # a feature: one example per file, as the coder writes them (one piece at a time)
-                for path, code in r["files"].items():
-                    first = next((ln.split()[0] for ln in code.splitlines() if ln.strip() and not ln.startswith(("//", "@", " "))), "")
-                    names = re.findall(r"^(?:[a-z]+\s+)?([A-Z][A-Za-z0-9]*)", code, re.MULTILINE)
-                    said = ". ".join(x for x in t["spec"].split(". ") if any(re.search(rf"\b{n}\b", x) for n in names))
-                    text = f"[example] {first} — {path}\n\nTask: {said or t['spec']}\n\n```nuclear\n{code.strip()}\n```"
-                    meta = {"source": f"eval:{t['id']}", "kind": first, "dialect": t["dialect"], "platform": t["platform"], "validated": "sonnet+nuclear check"}
-                    doc = {"collection": "examples", "id": f"eval-{t['id']}-{path.replace('/', '-')}", "text": text, "meta": meta}
-                    (await http.post("/v1/documents", json=doc)).raise_for_status()
-                    n += 1
-                await http.delete(f"/v1/documents/examples/eval-{t['id']}")  # the whole-feature example of before
-                continue
-            text = f"[example] {t['kind']} — {t['path']}\n\nTask: {t['task']}\n\n```nuclear\n{r['code'].strip()}\n```"
-            meta = {"source": f"eval:{t['id']}", "kind": t["kind"], "dialect": t["dialect"], "platform": PLATFORM[t["dialect"]], "validated": "sonnet+nuclear check"}
-            (await http.post("/v1/documents", json={"collection": "examples", "id": f"eval-{t['id']}", "text": text, "meta": meta})).raise_for_status()
-            n += 1
-    print(f"{n} examples in the graph")
+    """Every validated train answer is a row of the knowledge base (`assets/examples/solved.json`: the task, then the
+    code), written by `nuclear-graph knowledge build` from results/reference.json; then the graph learns them. The
+    held-out `test` tasks never reach the base."""
+    for action in (["knowledge", "build"], ["ingest"]):
+        subprocess.run([sys.executable, "-m", "nuclear_graph.cli", *action], check=True)
 
 
 async def local(only: str = "") -> None:
@@ -271,6 +250,79 @@ async def local_features(only: str = "") -> None:
                              "seconds": round(time.time() - started, 1), "trace": plan["trace"], **score(f, code, check)}
             save("local", runs)
             print(f"{f['id']:<28} {'PASS' if runs[f['id']]['pass'] else 'fail'}  {runs[f['id']]['seconds']:>5}s  {len(files)} files  {runs[f['id']]['missing'] or ''}  {'' if check == 'ok' else check.splitlines()[0]}")
+
+
+async def chat(only: str = "") -> None:
+    """The questions of the knowledge base that carry `says` (data/questions.toml), asked to the local assistant as the
+    editor's chat does: an answer passes when it contains every one of those texts."""
+    questions = [q for q in tomllib.loads((HERE.parent / "data" / "questions.toml").read_text())["question"] if q.get("says")]
+    passed = 0
+    async with httpx.AsyncClient(base_url=DEVELOPER, timeout=600) as http:
+        for q in questions:
+            if only and only.lower() not in q["ask"].lower():
+                continue
+            start = time.time()
+            r = await http.post("/developer/chat", json={"message": q["ask"], "platform": q.get("platform") or "backend"})
+            answer = r.json().get("report", "") if r.status_code == 200 else f"({r.status_code})"
+            missing = [t for t in q["says"] if t.lower() not in answer.lower()]
+            passed += not missing
+            print(f"{'PASS' if not missing else 'fail'} {time.time() - start:5.1f}s  {q['ask']}" + (f"\n      does not say {missing}: {' '.join(answer.split())[:300]}" if missing else ""))
+    print(f"{passed} answers of the assistant say what they must")
+
+
+def analysis_problems(case: dict, got: dict) -> list[str]:
+    """What an analysis lacks of what its case expects (tasks.toml, `[[analysis]]`)."""
+    out: list[str] = []
+    if got.get("strategy") != f"strategy:{case['strategy']}":
+        out.append(f"strategy {got.get('strategy', '?')} ({got.get('why', '')})")
+    calls: list[list[str]] = got.get("generate", [])
+    want = case.get("generate")
+    if want is None:
+        if calls:
+            out.append(f"an unexpected call: {' '.join(calls[0])}")
+    else:
+        call = calls[0] if calls else ["", "", ""]
+        options = {call[i]: call[i + 1] for i in range(3, len(call) - 1, 2)}
+        fields = {f.split(":")[0] for f in options.get("--fields", "").split()} - {"id"}
+        if call[1:3] != [want["component"], want["name"]]:
+            out.append(f"the call is for {' '.join(call[1:3]) or 'nothing'}")
+        if not set(want.get("fields", [])) <= fields or (want.get("fields") and len(fields) != want.get("count", len(want["fields"]))):
+            out.append(f"fields {sorted(fields)}")
+        if (want["source"] == "db") != (options.get("--source") == "db") or (want["source"] == "rest") != ("--from-json" in options):
+            out.append(f"source {options.get('--source') or options.get('--from-json', 'none')}")
+        if not set(want["actions"]) <= set(options.get("--actions", "").split(",")):
+            out.append(f"actions {options.get('--actions', 'none')}")
+    if bool(got.get("questions")) != bool(case.get("asks")):
+        out.append("it asks: " + "; ".join(got.get("questions", [])) if got.get("questions") else "it asks nothing")
+    paths = [p["path"] for p in got.get("pieces", [])]
+    out += [f"no piece {suffix}" for suffix in case.get("pieces", []) if not any(path.endswith(suffix) for path in paths)]
+    if case.get("tooled") and not all("code" in p for p in got.get("pieces", [])):
+        out.append("a piece is not written by the tool")
+    out += [f"the stage {s} runs" for s in case.get("skips", []) if s in got.get("stages", [])]
+    return out
+
+
+async def analyze(only: str = "") -> None:
+    """The analyst (ADR-0105): each `[[analysis]]` request of tasks.toml, in a fresh backend project that has an
+    `orders Order` resource: the strategy it gets, the generator call a request in plain words becomes, the pieces
+    the tools give, the questions it asks and the stages that run. Kept in results/analysis.json."""
+    cases = [c for c in tomllib.loads((HERE / "tasks.toml").read_text()).get("analysis", []) if not only or only in c["id"]]
+    results: dict[str, dict] = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        subprocess.run(["dragonfly", "new", "shop_api", "-p", "backend", "-d", "fastapi"], cwd=tmp, capture_output=True, check=True)
+        root = str(Path(tmp) / "shop_api")
+        subprocess.run(["dragonfly", "gen", "resource", "orders", "Order", "--fields", "id:int total:double status:string", "--source", "db"], cwd=root, capture_output=True, check=True)
+        async with httpx.AsyncClient(base_url=DEVELOPER, timeout=900) as http:
+            for case in cases:
+                start = time.time()
+                r = await http.post("/developer/analyze", json={"spec": case["request"], "platform": case.get("platform", "backend"), "root": root})
+                got = r.json() if r.status_code == 200 else {"strategy": f"({r.status_code})"}
+                wrong = analysis_problems(case, got)
+                results[case["id"]] = {"pass": not wrong, "wrong": wrong, "strategy": got.get("strategy"), "generate": got.get("generate", []), "seconds": round(time.time() - start, 1)}
+                print(f"{'PASS' if not wrong else 'fail'} {time.time() - start:5.1f}s  {case['id']}" + (f"\n      {'; '.join(wrong)}" if wrong else "") + "".join(f"\n      dragonfly gen {' '.join(c)}" for c in got.get("generate", [])))
+    save("analysis", results)
+    asked = [c for c in cases if "generate" in c]
+    print(f"{sum(r['pass'] for r in results.values())} of {len(results)} analyses as expected ({sum(results[c['id']]['pass'] for c in asked)} of {len(asked)} of the ones that ask a model)")
 
 
 def rescore() -> None:
@@ -331,6 +383,12 @@ if __name__ == "__main__":
         asyncio.run(reference_features())
     elif cmd == "distill":
         asyncio.run(distill())
+    elif cmd == "analyze":
+        asyncio.run(analyze(sys.argv[2] if len(sys.argv) > 2 else ""))
+        sys.exit(0)
+    elif cmd == "chat":
+        asyncio.run(chat(sys.argv[2] if len(sys.argv) > 2 else ""))
+        sys.exit(0)
     elif cmd == "local":
         asyncio.run(local(sys.argv[2] if len(sys.argv) > 2 else ""))
         asyncio.run(local_features(sys.argv[2] if len(sys.argv) > 2 else ""))
