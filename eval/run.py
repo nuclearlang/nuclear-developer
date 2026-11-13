@@ -130,7 +130,7 @@ async def reference() -> None:
     all_tasks, snippets = tasks()
     refs = load("reference")
     spent = sum(r.get("cost", 0) for r in refs.values())
-    guide = (Path(__file__).parents[2] / "nuclear-graph/src/nuclear_graph/prompts/piece.md").read_text()
+    guide = (Path(__file__).parents[2] / "nuclear-graph/prompts/piece.md").read_text()
     for t in all_tasks:
         if t["id"] in refs:
             continue
@@ -160,7 +160,7 @@ async def reference_features() -> None:
     """Sonnet writes every file of a feature in one answer, with one repair given the project's errors."""
     refs = load("reference")
     spent = sum(r.get("cost", 0) for r in refs.values())
-    root = Path(__file__).parents[2] / "nuclear-graph/src/nuclear_graph/prompts"
+    root = Path(__file__).parents[2] / "nuclear-graph/prompts"
     guide = (root / "plan.md").read_text() + "\n\n" + (root / "piece.md").read_text()
     for f in features():
         if f["id"] in refs or spent >= BUDGET_USD:

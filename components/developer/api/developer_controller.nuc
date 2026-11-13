@@ -1,7 +1,7 @@
-// The local developer over HTTP (127.0.0.1:7879): POST /developer/code, /test, /security, /document, /chat, /diagnose, /analyze and /plan. Each request
+// The local developer over HTTP (127.0.0.1:7879): POST /developer/code, /test, /security, /document, /chat, /diagnose, /analyze, /plan and /accept. Each request
 // runs on a thread of its own, so nothing of one request reaches the next.
 @controller("developer")
-controller DeveloperController(coder: Coder, tester: Tester, security: Security, documenter: Documenter, assistant: Assistant, diagnoser: Diagnoser, planner: Planner, analyst: Analyst)
+controller DeveloperController(coder: Coder, tester: Tester, security: Security, documenter: Documenter, assistant: Assistant, diagnoser: Diagnoser, planner: Planner, analyst: Analyst, acceptor: Acceptor)
   @post("code", status = 200)
   code(input: PieceRequest) PieceReply
     reply(~coder.run(start(input), thread = fresh()))
@@ -27,6 +27,12 @@ controller DeveloperController(coder: Coder, tester: Tester, security: Security,
   @post("diagnose", status = 200)
   diagnose(input: PieceRequest) PieceReply
     reply(~diagnoser.run(start(input), thread = fresh()))
+
+  // Each acceptance criterion held against what a run left: `task` the criteria, numbered; `context` the facts and
+  // the files of the run.
+  @post("accept", status = 200)
+  accept(input: PieceRequest) PieceReply
+    reply(~acceptor.run(start(input), thread = fresh()))
 
   @post("plan", status = 200)
   plan(input: PlanRequest) PlanReply

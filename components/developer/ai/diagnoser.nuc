@@ -23,11 +23,13 @@ graph Diagnoser(bench: Workbench, toolchain: Toolchain)
     report = "kind: ${state.failure}\naction: ${actionOf(state.failure)}\n\n${text.trim()}"
     { "code": "", "report": report, "check": "ok", "attempts": 1, "trace": state.trace + [bench.step("explain", bench.firstLine(text))] }
 
-  // The kind of a failure from its text, the first rule that matches: transient (the services or the network:
-  // retrying helps), environment (a tool or a package is missing), code (the compiler's errors), test (a test
+  // The kind of a failure from its text, the first rule that matches: disk (no room left: no retry helps until
+  // some is freed), transient (the services or the network: retrying helps), environment (a tool or a package is
+  // missing), code (the compiler's errors), test (a test
   // failed), spec (nothing to do was understood), else unknown.
   classify(text: string) string
     rules: <string, string> = {
+      "disk": r"(?i)MB free in|no space left on device|ENOSPC|disk quota exceeded",
       "transient": r"(?i)not running at|ECONNREFUSED|connection refused|timed out|timeout|\b(429|502|503|504)\b|temporarily unavailable",
       "environment": r"(?i)is not installed|command not found|ModuleNotFoundError|Cannot find module|No such file or directory|permission denied",
       // before `code`: an unknown class the plan never had is a plan that does not cover the spec
@@ -49,6 +51,7 @@ graph Diagnoser(bench: Workbench, toolchain: Toolchain)
   // What to do about each kind of failure.
   actionOf(kind: string) string
     actions = {
+      "disk": "free space on the disk the step names (old build folders, scratch projects, the temporary folder), then retry",
       "transient": "retry: the pipeline retries it by itself with growing waits; if it still fails, start the service it names",
       "environment": "install or start what is missing, then retry",
       "code": "repair the code: the compiler's errors say what and where",

@@ -10,7 +10,7 @@ graph Coder(bench: Workbench)
     detail = if found.note.length > 0
       found.note
     else
-      "${found.knowledge.length} characters of knowledge, ${found.examples.length} of examples"
+      "the cards — ${bench.read(found.knowledge)} — and the examples — ${bench.read(found.examples)}"
     // the files the piece depends on: what the caller pasted, and what the project itself declares of the task's names
     own = bench.files(state.root, state.task, skip = state.path, have = state.context)
     context = bench.sections([state.context, own])

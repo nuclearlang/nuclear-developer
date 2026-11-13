@@ -1,19 +1,30 @@
-// The assistant: answers a message of the chat about the project or about NuclearLang, with the cards of the graph
-// closest to the question (every shelf: what it is, how it is done, what can and cannot be done), the project's map
-// and the last messages of the session. It explains and proposes Nuclear; it changes no file (an order to change the
-// project is a Loop run). Prompt: agents/chat.md.
+// The assistant: answers a message of the chat about the project or about NuclearLang. The graph's query planner
+// reads the message first, without a model: a question with one right answer (every command of a tool, the tools of
+// the MCP server and their parameters, the commands that write a kind...) gets the rows of the graph's database,
+// whole (`facts`), and the rest the cards of the shelves closest to it (`knowledge`). The model writes the answer
+// from both, the project's map and the last messages of the session; the rows then end the answer as the graph gave
+// them, put there by this code: a model retells a long list in part, so the list never depends on it. It explains
+// and proposes Nuclear; it changes no file (an order to change the project is a Loop run). Prompt:
+// agents/chat.md.
 @state(PieceState)
 graph Assistant(bench: Workbench)
   @start
   @next("answer")
   recall(state: PieceState) <string, any>
-    cards = ~bench.lookup(state.task, state.platform)
-    { "guide": ~bench.knowledge.prompt("chat"), "knowledge": cards, "examples": "", "trace": state.trace + [bench.step("recall", "${cards.length} characters of knowledge")] }
+    found: <string, string> = ~bench.answer(state.task, state.platform, state.history)
+    facts = found["facts"] ?? ""
+    cards = found["knowledge"] ?? ""
+    needs = found["needs"] ?? ""
+    exact = Regex(r"^### (.+)$", multiline = true).findAll(facts).map((m) => m[1] ?? "")
+    steps = [bench.step("exact", exact.length > 0 ? "from the graph's database: ${exact.join("; ")}" : "no question with one right answer in it${needs.length > 0 ? " (close to: ${needs.split("\n").join("; ")})" : ""}"), bench.step("recall", "the cards — ${bench.read(cards)}")]
+    { "guide": ~bench.knowledge.prompt("chat"), "knowledge": cards, "facts": facts, "examples": "", "trace": state.trace + steps }
 
   @next("end")
   answer(state: PieceState) <string, any>
     files = bench.files(state.root, state.task)
-    prompt = ~bench.prompt("chat", { "guide": state.guide, "knowledge": state.knowledge, "examples": state.examples, "map": state.map, "files": files, "history": state.history, "message": state.task, "platform": state.platform })
-    report = ~bench.ask("default", prompt)
+    prompt = ~bench.prompt("chat", { "guide": state.guide, "facts": state.facts, "knowledge": state.knowledge, "examples": state.examples, "map": state.map, "files": files, "history": state.history, "message": state.task, "platform": state.platform })
+    said = ~bench.ask("default", prompt)
+    // the exact rows reach the developer as they are, whatever the model wrote of them
+    report = state.facts.length > 0 ? "${said.trim()}\n\n${state.facts}" : said.trim()
     // `context`: the characters the model read, so the editor shows how full its context window was
-    { "code": "", "report": report.trim(), "check": "ok", "attempts": 1, "trace": state.trace + [bench.step("context", "${prompt.length}"), bench.step("answer", bench.firstLine(report))] }
+    { "code": "", "report": report, "check": "ok", "attempts": 1, "trace": state.trace + [bench.step("context", "${prompt.length}"), bench.step("answer", bench.firstLine(said))] }

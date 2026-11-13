@@ -1,0 +1,12 @@
+// The acceptor: holds each acceptance criterion of a spec against what a run left. The facts come from the Loop (the
+// files of the run, how many tests they declare, the commands that passed); the model says, per criterion, whether
+// they show it met and where. It changes nothing, and its verdict is evidence for the reviewer, never a gate.
+// Prompt: agents/accept.md.
+@state(PieceState)
+graph Acceptor(bench: Workbench)
+  @start
+  @next("end")
+  judge(state: PieceState) <string, any>
+    prompt = ~bench.prompt("accept", { "criteria": state.task, "result": state.context })
+    report = ~bench.ask("default", prompt)
+    { "code": "", "report": report.trim(), "check": "ok", "attempts": 1, "trace": state.trace + [bench.step("read", "${state.task.split("\n").length} criteria against ${state.context.length} characters of files and facts"), bench.step("judge", report.trim().split("\n").join(" · "))] }

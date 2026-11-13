@@ -10,12 +10,27 @@ tests WorkbenchTests
     expect("KNOWLEDGE" in prompt and "EXAMPLES" in prompt and "File `a.nuc`." in prompt)
     expect(not ("## The files it uses" in prompt))
 
+  @test("a section whose value is empty is dropped with the words written around it")
+  emptySection() void
+    bench = inject<Workbench>()
+    values = { "guide": "GUIDE", "facts": "", "knowledge": "CARDS", "examples": "", "map": "", "files": "", "history": "", "message": "what is nuclear", "platform": "backend" }
+    open = ~bench.prompt("chat", values)
+    expect(not ("Exact facts" in open) and "## What the documentation says\n\nCARDS" in open and open.endsWith("what is nuclear"))
+    exact = ~bench.prompt("chat", { ...values, "facts": "ROWS" })
+    expect("## Exact facts" in exact and "invent none.\n\nROWS" in exact)
+
   @test("an unreachable graph is a note, not an error")
   unreachable() void
     bench = Workbench(GraphClient(url = "http://127.0.0.1:9"), Toolchain())
     found = ~bench.recall("a model", "backend", "piece")
     expect(found.note.startsWith("the Nuclear Smart Graph is not reachable"))
     expect(found.knowledge == "")
+
+  @test("a step names the cards it read")
+  read() void
+    bench = inject<Workbench>()
+    expect(bench.read("[concepts/concept] The MCP\n\nbody\n\n[tools/command] dragonfly make") == "concept: The MCP; command: dragonfly make")
+    expect(bench.read("") == "nothing")
 
   @test("the compiler accepts valid Nuclear and explains invalid Nuclear")
   check() void
@@ -43,6 +58,17 @@ tests WorkbenchTests
     expect(again.length == 1 and again[0]["path"] == "components/library/domain/usecases/count_books.nuc")
     changed = ~planner.pieces("repository | BookRepository | books | - | count()", "mobile", "A repository BookRepository with count() int.", has)
     expect(changed.length == 1 and changed[0]["path"] == "components/library/data/book_repository.nuc")
+
+  @test("a spec in plain words keeps every piece the model designed, but its tests: a capitalised noun names no declaration")
+  plainWords() void
+    planner = inject<Planner>()
+    raw = "entity | Character | character | id: int, name: string\nrepository | CharacterRepository | character | getCharacters(page)\nusecase | GetCharactersUsecase | character | execute(page)\ncontroller | CharacterController | character | getCharacters(page)\nappcomponent | CharacterAppComponent | character |\ntests | CharacterRepositoryTest |"
+    planned = ~planner.pieces(raw, "backend", "This implementation calls the api and gives the same output for the list of characters. The model is: Character schema, id int, name string.")
+    expect(planned.map((p) => p["kind"]!) == ["entity", "repository", "usecase", "controller", "appcomponent"])
+    // a line without a component takes the plural of the first name
+    expect(planned[1]["path"] == "components/characters/data/repositories/character_repository.nuc")
+    // the task is the model's line: no sentence of the spec is about that file
+    expect(planned[0]["task"]! == "entity Character: id: int, name: string")
 
   @test("an answer is held to the task's own words: quoted texts, calls and status codes")
   faithful() void
@@ -72,6 +98,7 @@ tests WorkbenchTests
     diagnoser = inject<Diagnoser>()
     expect(diagnoser.classify("the local developer is not running at http://127.0.0.1:7879 (fetch failed)") == "transient")
     expect(diagnoser.classify("dragonfly: command not found") == "environment")
+    expect(diagnoser.classify("278 MB free in /tmp (at least 500 MB are needed: free some space)") == "disk")
     expect(diagnoser.classify("a.nuc:3:5 N0106 'book' is not defined") == "code")
     expect(diagnoser.classify("FAILED tests/books_test.py::test_add - assert 0 == 1") == "test")
     expect(diagnoser.classify("the planner gave 0 pieces") == "spec")

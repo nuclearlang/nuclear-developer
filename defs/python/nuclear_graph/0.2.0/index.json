@@ -1,0 +1,38 @@
+{
+"format": 1,
+"libraries": ["nuclear_graph.client","nuclear_graph.toolchain","nuclear_graph.workspace"],
+"reexports": {},
+"symbols": {
+  "Callable": 0,
+  "GraphClient": 0,
+  "PLATFORM_NAMES": 1,
+  "Paths": 0,
+  "Ran": 1,
+  "SKIP": 2,
+  "Secrets": 0,
+  "Toolchain": 1,
+  "Workspace": 2,
+  "annotations": 0,
+  "as_text": 0,
+  "bracket_from": 1,
+  "declaration_pattern": 2,
+  "describe": 1,
+  "diagnostics_of": 1,
+  "graph_url": 0,
+  "layout_path": 1,
+  "lines_of": 1,
+  "run_tool": 1,
+  "snake": 1,
+  "strip_fences": 1,
+  "target": 1,
+  "token_of": 0
+},
+"classes": {
+  "GraphClient": {"supers":[],"members":["answer","applies","brief","call","card","client","examples","items","kinds","pitfalls","prompt","remember","search","stats","strategy","url"],"params":["client","url"]},
+  "Paths": {"supers":[],"members":[],"params":[]},
+  "Ran": {"supers":[],"members":["code","out"],"params":["code","out"]},
+  "Secrets": {"supers":[],"members":[],"params":[]},
+  "Toolchain": {"supers":[],"members":["brief","build","check","check_project","dragonfly","fmt","help","layout","path_of"],"params":[]},
+  "Workspace": {"supers":[],"members":["base","context","declarations","files","find","grep","inside","list","named","outline","parts","read","renamed","renames","root","skipped"],"params":["root"]}
+}
+}

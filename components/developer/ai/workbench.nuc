@@ -2,7 +2,7 @@
 // comment, so none is offered to a model as a tool: the graphs call them in a fixed order, because a small model
 // follows steps better than it chooses tools.
 //
-// The prompts are files of the graph (`nuclear-graph/src/nuclear_graph/prompts/agents/<name>.md`), read with
+// The prompts are files of the graph (`nuclear-graph/prompts/agents/<name>.md`), read with
 // `prompt(name, values)`: nothing a model reads is written inside this code.
 tools Workbench(knowledge: GraphClient, toolchain: Toolchain)
 
@@ -31,6 +31,25 @@ tools Workbench(knowledge: GraphClient, toolchain: Toolchain)
   // with a line for the rows it links to.
   lookup(question: string, platform: string) string
     ~knowledge.search(question, k = 4, platform = platform, agents = true, expand = true)
+
+  // What the graph gives for a question of the chat before the model reads it (the graph's query planner; no model
+  // is asked): `facts`, the exact answer of every question with one right answer the question is (the rows of the
+  // graph's database, whole); `knowledge`, the cards the shelves answer by meaning; `needs`, the exact questions it
+  // is close to that lack a name. `history`: the conversation so far, read for the names a follow-up leaves out. A
+  // graph that cannot plan (an older one) gives only the cards.
+  answer(question: string, platform: string, history: string) <string, string>
+    try
+      ~knowledge.answer(question, platform = platform, history = history, agents = true)
+    catch e
+      { "facts": "", "knowledge": ~lookup(question, platform), "needs": "" }
+
+  // The cards a text of the graph holds, by name: `[shelf/type] Title` is the first line of each. What an agent's
+  // step says it read, so a run's trace names its sources.
+  read(text: string) string
+    titles: string[] = []
+    for m in Regex(r"^\[(\w+)/([\w-]+)\] (.+)$", multiline = true).findAll(text)
+      titles.add("${m[2]}: ${m[3]}")
+    titles.length > 0 ? titles.join("; ") : "nothing"
 
   // The cards of the diagnostics a text names (`N0114`...), at most three: what each error means and how it is fixed.
   explain(text: string) string
@@ -70,16 +89,21 @@ tools Workbench(knowledge: GraphClient, toolchain: Toolchain)
 
   // ---- the prompts ----
 
-  // The prompt file `agents/<name>.md` with each `{{key}}` filled. A `## ` section whose body is left empty is
-  // dropped, so a model never reads an empty heading.
+  // The prompt file `agents/<name>.md` with each `{{key}}` filled. A `## ` section all of whose values are empty is
+  // dropped whole, with the words the file writes around them: a model never reads an empty heading, nor what to do
+  // with rows it was not given (it copies those words into its answer).
   prompt(name: string, values: <string, string>) string
     text = ~knowledge.prompt("agent.${name}")
-    for key, value in values
-      text = text.replaceAll("{{${key}}}", value)
     parts = text.split("\n## ")
-    kept: string[] = [parts[0]]
-    for part in parts.slice(1)
-      if part.split("\n").slice(1).join("\n").trim().length > 0
+    kept: string[] = []
+    for at in 0..parts.length
+      named = Regex(r"\{\{(\w+)\}\}").findAll(parts[at]).map((m) => m[1] ?? "")
+      if at > 0 and named.length > 0 and named.all((key) => (values[key] ?? "").length == 0)
+        continue
+      part = parts[at]
+      for key, value in values
+        part = part.replaceAll("{{${key}}}", value)
+      if at == 0 or part.split("\n").slice(1).join("\n").trim().length > 0
         kept.add(part)
     kept.join("\n## ").trim()
 

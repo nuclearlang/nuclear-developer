@@ -14,7 +14,7 @@ graph Planner(bench: Workbench, toolchain: Toolchain)
     limits: string[] = ~bench.knowledge.applies(state.task, state.platform)
     if state.task.length > 6000
       limits.add(~bench.knowledge.brief("limit:agent-context"))
-    { "guide": found.guide, "knowledge": "${layout}\n\n${found.knowledge}", "limits": limits, "trace": state.trace + [bench.step("recall", "plan guide, the platform's layout and structure")] + limits.map((l) => bench.step("limit", l)) }
+    { "guide": found.guide, "knowledge": "${layout}\n\n${found.knowledge}", "limits": limits, "trace": state.trace + [bench.step("recall", "the plan guide, the platform's layout (nuclear help layout) and the cards — ${bench.read(found.knowledge)}")] + limits.map((l) => bench.step("limit", l)) }
 
   @next("end")
   split(state: PieceState) <string, any>
@@ -74,7 +74,10 @@ graph Planner(bench: Workbench, toolchain: Toolchain)
   // The lines `kind | Name | component | screen | what` → pieces with the layout's path. A small model may move the
   // columns: the kind is the cell the layout knows, the name the first one in PascalCase. Left out: a line without
   // both, a name already planned and, when the spec names its declarations, a name it does not (the planner splits
-  // the spec; it does not design more). A component that is not a plain name takes the one the other lines give.
+  // such a spec; it does not design more). A spec names a declaration with its kind's word before it ("a use case
+  // CancelOrder") or with a name of two words or more (`CancelOrder`); a capitalised noun alone ("Character schema")
+  // names none, so a spec in plain words keeps every line the model designed, but its tests: the Tests first stage
+  // writes those from the acceptance criteria. A component that is not a plain name takes the one the other lines give.
   // Each piece's task ends with the spec's own sentence about it: the model's summary may lose a detail.
   // `declared`: what the project already has (name → file). A name of it the spec only uses (`repository:
   // BookRepository`) is not planned again; one the spec introduces with its kind's word ("a repository BookRepository
@@ -127,11 +130,17 @@ graph Planner(bench: Workbench, toolchain: Toolchain)
     for known, file in declared
       if home.length == 0 and file.startsWith("components/") and Regex("\\b${known}\\b").test(spec)
         home = file.split("/")[1]
-    named = rows.filter((r) => r["name"]! in spec)
+    // the declarations the spec names: the ones it introduces, and every name of two words or more it writes
+    written: string[] = introduced + []
+    for m in Regex(r"\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b").findAll(spec)
+      written.add(m[0] ?? "")
+    named = written.length > 0 ? rows.filter((r) => r["name"]! in spec) : []
     if named.length > 0
       // in the order the spec gives them: a spec lists what it builds on first
       rows = named
       rows.sortBy((r) => spec.indexOf(r["name"]!))
+    else
+      rows = rows.filter((r) => r["kind"]! != "tests")
     out: <string, string>[] = []
     planned: string[] = []
     for r in rows
@@ -144,8 +153,10 @@ graph Planner(bench: Workbench, toolchain: Toolchain)
         // the sentence that introduces it: the first one that names it as a word (`Book`, not `BookRepository`); later
         // ones only use it (`Result<BookError, Book[]>`) and would make the coder write their declarations too
         word = Regex("\\b${name}\\b")
-        introduced = spec.split(". ").filter((x) => word.test(x))
-        said = introduced.length > 0 ? introduced[0].trim() : ""
+        sentences = spec.split(". ").filter((x) => word.test(x))
+        // a sentence of the spec is the piece's task only when the spec named the piece: the first mention of a
+        // word of a spec in plain words is not about that file
+        said = named.length > 0 and sentences.length > 0 ? sentences[0].trim() : ""
         // the spec's own sentence is the task; the model's summary only when the spec has none (a 2B summary turned
         // an alias `booksOf() = BooksOfAuthor.exec` into a method signature, and the coder followed it)
         task = said.length > 0 ? "${kind} ${name}. The spec says: ${said}" : "${kind} ${name}: ${r["what"]!}"

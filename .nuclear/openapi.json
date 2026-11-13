@@ -332,6 +332,48 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/developer/accept": {
+      "post": {
+        "operationId": "DeveloperController.accept",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PieceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PieceReply"
+                }
+              }
+            },
+            "description": "ok"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "the error of the use case"
+          }
+        },
+        "summary": "Each acceptance criterion held against what a run left: `task` the criteria, numbered; `context` the facts and the files of the run.",
+        "tags": [
+          "developer"
+        ]
+      }
+    },
     "/developer/analyze": {
       "post": {
         "operationId": "DeveloperController.analyze",

@@ -2,7 +2,7 @@
 
 Local AI agents for [NuclearLang](https://github.com/nuclearlang/nuclear) and Dragonfly, on models of at most 3B
 parameters, as the junior developer of a frontier model: **coder**, **tester**, **security reviewer**, **planner**,
-**analyst**, **documenter**, **diagnoser** and **assistant**.
+**analyst**, **documenter**, **diagnoser**, **acceptor** and **assistant**.
 What a small model cannot hold in its head comes from the [Nuclear Smart Graph](https://github.com/nuclearlang/nuclear-graph)
 (the ecosystem's private knowledge base); what it writes is checked by the Nuclear compiler before it answers.
 
@@ -57,8 +57,9 @@ log and the closest known failures.
 | Tester | `qwen2.5-coder:3b` | `POST /developer/test` | writes the Nuclear tests (`tests` kind) of a piece of code | delete a failing test |
 | Security | `gemma4:e2b` | `POST /developer/security` | reviews code against the platform's security rules + the compiler | change the code |
 | Documenter | `gemma4:e2b` | `POST /developer/document` | reads a run's journal and writes what was done: what it built, how it checked it, what is left (only facts of the journal) | change the code |
-| Assistant | `gemma4:e2b` | `POST /developer/chat` | answers a message of the editor's chat about the project, from the project's map, the session's last messages and the graph | change a file (an order is a Loop run) |
+| Assistant | `gemma4:e2b` | `POST /developer/chat` | answers a message of the editor's chat about the project, from the project's map, the session's last messages and the graph; a question with one right answer (which, how many, what are) gets the rows of the graph's exact facts, which end the answer as they are (ADR-0107) | change a file (an order is a Loop run) |
 | Diagnoser | `gemma4:e2b` | `POST /developer/diagnose` | when a pipeline stage fails: the kind of failure by fixed rules (transient, environment, code, test, spec), the evidence from the tools (`nuclear check`, `dragonfly doctor`) and the next step in plain words | change anything |
+| Acceptor | `gemma4:e2b` | `POST /developer/accept` | after a run's verification passes: holds each acceptance criterion against what the run left (its files, its tests, the commands that passed) and says which are shown met, with the evidence | fail a run (its verdict is for the reviewer) |
 | Planner | `gemma4:e2b` | `POST /developer/plan` | splits a spec into pieces of one file, in order; each path comes from the platform's layout (`nuclear help layout`), each kind and forgotten piece from the spec's own words | choose a folder, or plan what the spec does not name |
 
 Chat: `{message, platform, map, history, root}` → the same answer (`report`). Request (`code`, `test`, `security`,
@@ -77,13 +78,13 @@ Each request runs on a thread of its own. **The agents write only Nuclear**: the
 `nuclear check --platform` (ADR-0102 §11).
 
 The sources: `components/developer/ai/` (`workbench.nuc` — what every agent shares —, `coder.nuc`, `tester.nuc`,
-`security.nuc`, `documenter.nuc`, `assistant.nuc`, `diagnoser.nuc`, `planner.nuc`, `analyst.nuc`, `states/piece_state.nuc`), `components/developer/domain/models/`,
+`security.nuc`, `documenter.nuc`, `assistant.nuc`, `diagnoser.nuc`, `acceptor.nuc`, `planner.nuc`, `analyst.nuc`, `states/piece_state.nuc`), `components/developer/domain/models/`,
 `components/developer/api/developer_controller.nuc`, `config/project_config.nuc` (the two Ollama models),
 `config.nuc` (`dependencies(nuclear_graph = "../nuclear-graph")`), `defs/` (the type definitions of
 `nuclear_graph.client`, `nuclear_graph.toolchain` and `nuclear_graph.workspace`, generated with `tools/defs/python/gen.py`).
 
 **The prompts are files**, never strings in the code: every prompt a model reads is
-`nuclear-graph/src/nuclear_graph/prompts/agents/<step>.md` (`{{name}}` filled by `Workbench.prompt`, an empty `## `
+`nuclear-graph/prompts/agents/<step>.md` (`{{name}}` filled by `Workbench.prompt`, an empty `## `
 section dropped; the list is that folder's README), over the use-case guides `prompts/<use case>.md`.
 
 ## Run it

@@ -2,6 +2,13 @@
 
 ## Unreleased (2026-11-11)
 
+- A section of a prompt file all of whose values are empty is dropped whole, with the words the file writes around
+  them (`Workbench.prompt`); before, only a section left with nothing under its heading was. The chat's prompt kept
+  "Exact facts" and what to do with its rows when the graph gave none, and the 2B model ended its answer with those
+  instructions. With the graph's planner no longer running a query for an open question ("que es nuclear lang?" was
+  answered with every command of `nuclear`), such an answer is the explanation alone.
+- The type check is clean again (pyright strict over `build/`, 0 errors): `nuclear_graph` 0.2.0 says it is typed, and
+  a `catch` that does not name what it caught binds no variable in Python.
 - The agents read the graph as a library (ADR-0104): the coder and the tester get the card of the kind they write, the
   pitfalls of that kind, solved tasks and an example file of that kind; a repair gets the card of each error code the
   compiler named (prompt `agents/repair.md`); the assistant searches every shelf and answers in the developer's
@@ -42,3 +49,13 @@
 - The set-up of the AI services installs and starts it (ADR-0106): the `nuclear-developer` command starts with the
   models of the machine's profile (`~/.config/nuclearlang/ai.env`) unless its caller gives others. README: the
   profiles and what each was measured to do.
+- The assistant asks the graph's query planner before the model (ADR-0107): a question with one right answer gets the
+  rows of the graph's exact facts, whole (`Workbench.answer`, the prompt's "Exact facts"; the rows end the answer as
+  they are, put there by code, whatever the model wrote of them), and the trace says which
+  queries ran (`exact`) and which cards were read, by title (`recall`; also the coder's, the tester's and the
+  planner's). `eval/run.py chat` asks the `says` questions of the catalogue. `defs/` regenerated for
+  `nuclear_graph` 0.2.0 (the graph is written in Nuclear).
+- `POST /developer/accept` (the acceptor, prompt `agents/accept.md`): each acceptance criterion of a spec held
+  against what a run left (met or not, with the evidence), for the Loop's last step; it informs, it never gates.
+- The planner keeps every piece a spec in plain words needs: only the test rows are left to the tester (it had kept
+  one piece of ten for "implements list character feature").

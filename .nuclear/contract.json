@@ -3,7 +3,7 @@
   "controllers": {
     "DeveloperController": {
       "component": "developer",
-      "description": "The local developer over HTTP (127.0.0.1:7879): POST /developer/code, /test, /security, /document, /chat, /diagnose, /analyze and /plan. Each request runs on a thread of its own, so nothing of one request reaches the next.",
+      "description": "The local developer over HTTP (127.0.0.1:7879): POST /developer/code, /test, /security, /document, /chat, /diagnose, /analyze, /plan and /accept. Each request runs on a thread of its own, so nothing of one request reaches the next.",
       "path": "developer",
       "routes": [
         {
@@ -82,6 +82,20 @@
             }
           ],
           "path": "diagnose",
+          "returns": "PieceReply",
+          "verb": "post"
+        },
+        {
+          "description": "Each acceptance criterion held against what a run left: `task` the criteria, numbered; `context` the facts and the files of the run.",
+          "name": "accept",
+          "params": [
+            {
+              "in": "body",
+              "name": "input",
+              "type": "PieceRequest"
+            }
+          ],
+          "path": "accept",
           "returns": "PieceReply",
           "verb": "post"
         },
